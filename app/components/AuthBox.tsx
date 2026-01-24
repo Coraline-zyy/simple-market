@@ -46,7 +46,8 @@ export default function AuthBox({ lang, initialEmail = "" }: Props) {
     setSending(true);
 
     // ✅ 带上 lang，确保回调回来还是同语言
-    const redirectTo = `${window.location.origin}/${L}/auth/callback`;
+    const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    const redirectTo = `${base}/${L}/auth/callback`;
 
     const { error } = await supabase.auth.signInWithOtp({
       email: e,
