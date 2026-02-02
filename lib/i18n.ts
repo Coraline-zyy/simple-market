@@ -43,7 +43,7 @@ const zh = {
     title: "首页",
     subtitle: "未登录可浏览；邮箱登录后可发布并查看联系方式。",
     footerLine1: "联系方式：3266506883@qq.com",
-    footerLine2: "这只是一个大学生的奇思妙想，如果您有任何好的建议，请告诉我，我会尽快回复。",
+    footerLine2: "这只是一个大学生的奇思妙想，如果您有任何好的建议或对这个网站感兴趣，请告诉我，我会尽快回复。",
   },
 
   auth: {
@@ -249,7 +249,7 @@ const en = {
     title: "Home",
     subtitle: "Browse without login. Sign in with email to publish and view contacts.",
     footerLine1: "Contact: 3266506883@qq.com",
-    footerLine2: "This is just a blue-sky thinking of a college student. If you have any good suggestions, please let me know and I will reply as soon as possible.",
+    footerLine2: "This is just a blue-sky thinking of a college student. If you have any good suggestions or interested in this website, please let me know and I will reply as soon as possible.",
   },
 
   auth: {
