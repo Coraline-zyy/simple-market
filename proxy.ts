@@ -21,18 +21,18 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 根路径 -> /zh
+  // Root and unprefixed routes default to English.
   if (pathname === "/") {
     const url = req.nextUrl.clone();
-    url.pathname = "/zh";
+    url.pathname = "/en";
     return NextResponse.redirect(url);
   }
 
-  // 第一段不是 lang -> 补 /zh
+  // Prefix unlocalized routes with English.
   const seg1 = pathname.split("/")[1];
   if (!isLang(seg1)) {
     const url = req.nextUrl.clone();
-    url.pathname = `/zh${pathname}`;
+    url.pathname = `/en${pathname}`;
     return NextResponse.redirect(url);
   }
 
