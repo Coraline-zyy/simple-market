@@ -2,12 +2,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { safeLang } from "@/lib/i18n";
 
 export default function LanguageSwitch() {
-  const router = useRouter();
-  const pathname = usePathname() || "/zh";
+  const pathname = usePathname() || "/en";
 
   const { currentLang, nextPath } = useMemo(() => {
     const parts = pathname.split("/");
@@ -26,9 +25,7 @@ export default function LanguageSwitch() {
     <button
       type="button"
       onClick={() => {
-        // ✅ 用 replace 更干净；也可以 push
-        router.replace(nextPath);
-        // ❌ 不要 refresh（会导致 auth 状态抖动/重新初始化）
+        window.location.assign(nextPath);
       }}
       className="rounded-xl border border-zinc-700 hover:border-zinc-500 px-3 py-2 text-sm text-zinc-100"
     >

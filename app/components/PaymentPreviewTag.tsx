@@ -1,0 +1,1 @@
+export default function PaymentPreviewTag({lang}:{lang:"zh"|"en"}){return <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/10 px-3 py-1 text-xs font-normal text-amber-300">{lang==="zh"?"页面预览 · 未开通支付":"UI preview · Payments unavailable"}</span>}
