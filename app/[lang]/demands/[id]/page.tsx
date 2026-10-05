@@ -1,20 +1,28 @@
 "use client";
+import { formatTaskTime, TaskTime } from "@/lib/taskTime";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import AuthBox from "@/app/components/AuthBox";
+import PostImageGallery from "@/app/components/PostImageGallery";
+import ReportButton from "@/app/components/ReportButton";
+import OwnerBadge from "@/app/components/OwnerBadge";
 import { supabase } from "@/lib/supabaseClient";
 import { getT, safeLang } from "@/lib/i18n";
 
-type Demand = {
+type Demand = TaskTime & {
   id: string;
   owner_id: string;
   title: string;
   description: string | null;
   category: string;
   budget: number | null;
+  required_deposit: number;
   status?: "active" | "completed";
   created_at: string;
+  image_paths?: string[];
+  task_starts_at?: string | null;
+  task_ends_at?: string | null;
+  task_date_only?: boolean;
 };
 
 type Conversation = {
@@ -49,7 +57,7 @@ export default function DemandDetailPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setUserEmail(data.session?.user?.email ?? null);
-    });
+    }).catch(() => setUserEmail(null));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUserEmail(session?.user?.email ?? null);
     });
@@ -66,7 +74,7 @@ export default function DemandDetailPage() {
 
       const { data, error } = await supabase
         .from("demands")
-        .select("id, owner_id, title, description, category, budget, status, created_at")
+        .select("id, owner_id, title, description, category, budget, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone")
         .eq("id", id)
         .maybeSingle();
 
@@ -173,7 +181,7 @@ export default function DemandDetailPage() {
     try {
       const conv = await getOrCreateConversation(item.id, item.owner_id, user.id);
       if (!conv?.id) throw new Error(lang === "zh" ? "会话创建失败" : "Conversation creation failed");
-      window.location.href = `/${lang}/me?tab=chat&conv=${conv.id}`;
+      window.location.href = `/${lang}/transactions/${conv.id}`;
     } catch (e: any) {
       setStatus((lang === "zh" ? "发起对话失败：" : "Failed to start chat: ") + (e?.message ?? "Unknown"));
     } finally {
@@ -193,16 +201,14 @@ export default function DemandDetailPage() {
           </a>
         </div>
 
-        <div className="mt-6">
-          <AuthBox lang={lang} />
-          {!canUse && <div className="mt-3 text-sm text-amber-300">{t.demandsHall.form.needEmail}</div>}
-        </div>
+        {!canUse && <div className="mt-3 text-sm text-amber-300">{t.demandsHall.form.needEmail}</div>}
 
         <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
           {!item ? (
             <div className="text-zinc-400">{status || (lang === "zh" ? "找不到这条需求（可能已被删除或隐藏）。" : "Demand not found.")}</div>
           ) : (
             <>
+              <OwnerBadge userId={item.owner_id} lang={lang} />
               <div className="flex items-start justify-between gap-3">
                 <div className="text-2xl font-bold">{item.title}</div>
                 <div className="flex gap-2 items-center">
@@ -219,25 +225,20 @@ export default function DemandDetailPage() {
 
               {item.description && <div className="mt-3 text-zinc-300 whitespace-pre-wrap">{item.description}</div>}
 
+              <p className="mt-3 text-sm text-violet-300">{formatTaskTime(item, lang)}</p>
+              <PostImageGallery paths={item.image_paths} />
+
               <div className="mt-4 text-sm text-zinc-500 flex gap-4 flex-wrap">
                 <span>{new Date(item.created_at).toLocaleString()}</span>
                 {item.budget != null && <span>{lang === "zh" ? "预算" : "Budget"} ¥ {item.budget}</span>}
+                <span className="text-amber-300">{lang==="zh"?"任务押金":"Task deposit"} £{Number(item.required_deposit??0).toFixed(2)}</span>
               </div>
 
-              <div className="mt-6">
-                {contact ? (
-                  <div className="text-zinc-200">
-                    {lang === "zh" ? "联系方式：" : "Contact: "} <span className="font-semibold">{contact}</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={loadContact}
-                    disabled={loadingContact}
-                    className="rounded-xl border border-zinc-700 hover:border-zinc-500 px-5 py-2 text-zinc-100 disabled:opacity-40"
-                  >
-                    {loadingContact ? (lang === "zh" ? "加载中..." : "Loading...") : (lang === "zh" ? "查看联系方式（邮箱登录后）" : "View contact (email login)")}
-                  </button>
-                )}
+              <div className="mt-5 flex items-center gap-5 flex-wrap text-sm">
+                <a href={`/${lang}/users/${item.owner_id}`} className="text-zinc-300 underline underline-offset-4 hover:text-white">
+                  {lang === "zh" ? "查看发布者主页" : "View owner profile"}
+                </a>
+                <ReportButton reportedUserId={item.owner_id} postType="demand" postId={item.id} />
               </div>
 
               <div className="mt-4">

@@ -1,11 +1,16 @@
 // app/[lang]/demands/page.tsx
 "use client";
+import {DepositDraft} from "@/app/components/PaymentPreview";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import AuthBox from "@/app/components/AuthBox";
+import PostImageGallery from "@/app/components/PostImageGallery";
+import { MAX_POST_IMAGES, uploadPostImages } from "@/lib/media";
 import { supabase } from "@/lib/supabaseClient";
 import { ALL_VALUE, getT, safeLang } from "@/lib/i18n";
 import { useParams } from "next/navigation";
+import OwnerBadge from "@/app/components/OwnerBadge";
+import TaskTimeFields from "@/app/components/TaskTimeFields";
+import { ANY_TIME, TimeRange, timePayload, overlapsTime, formatTaskTime } from "@/lib/taskTime";
 
 type Demand = {
   id: string;
@@ -14,20 +19,31 @@ type Demand = {
   description: string | null;
   category: string;
   budget: number | null;
+  required_deposit: number;
   status: "active" | "completed";
   created_at: string;
+  image_paths: string[];
+  task_starts_at: string | null;
+  task_ends_at: string | null;
+  task_date_only: boolean;
 };
 
 function normalizeDemand(row: any): Demand {
   return {
+    ...row,
     id: row.id,
     owner_id: row.owner_id,
     title: row.title ?? "",
     description: row.description ?? null,
     category: row.category ?? "其他",
     budget: row.budget ?? null,
+    required_deposit: Number(row.required_deposit ?? 0),
     status: row.status ?? "active",
     created_at: row.created_at ?? new Date().toISOString(),
+    image_paths: Array.isArray(row.image_paths) ? row.image_paths : [],
+    task_starts_at: row.task_starts_at ?? null,
+    task_ends_at: row.task_ends_at ?? null,
+    task_date_only: !!row.task_date_only,
   };
 }
 
@@ -47,7 +63,9 @@ export default function DemandsPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string>(t.categories.other);
   const [budget, setBudget] = useState("");
-  const [contact, setContact] = useState("");
+  const [requiredDeposit,setRequiredDeposit]=useState("0");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [showPublish, setShowPublish] = useState(false);
 
   // auth
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -56,6 +74,8 @@ export default function DemandsPage() {
   // search/filter
   const [q, setQ] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>(ALL_VALUE);
+  const [timeRange, setTimeRange] = useState<TimeRange>(ANY_TIME);
+  const [taskTime, setTaskTime] = useState<TimeRange>(ANY_TIME);
 
   // contacts cache (email only can view)
   const [contacts, setContacts] = useState<Record<string, string>>({});
@@ -74,7 +94,7 @@ export default function DemandsPage() {
     supabase.auth.getSession().then(({ data }) => {
       const u = data.session?.user ?? null;
       setUserEmail(u?.email ?? null);
-    });
+    }).catch(() => setUserEmail(null));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user?.email ?? null);
     });
@@ -92,7 +112,7 @@ export default function DemandsPage() {
     setStatusMsg("");
     const { data, error } = await supabase
       .from("demands")
-      .select("id, owner_id, title, description, category, budget, status, created_at")
+      .select("id, owner_id, title, description, category, budget, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone")
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .limit(100);
@@ -209,9 +229,10 @@ export default function DemandsPage() {
         it.title.toLowerCase().includes(kw) ||
         (it.description ?? "").toLowerCase().includes(kw);
       const hitCat = filterCategory === ALL_VALUE || it.category === filterCategory;
-      return hitKw && hitCat;
+      const hitTime = overlapsTime(it, timeRange);
+      return hitKw && hitCat && hitTime;
     });
-  }, [items, q, filterCategory]);
+  }, [items, q, filterCategory, timeRange]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -234,18 +255,26 @@ export default function DemandsPage() {
       setStatusMsg(lang === "zh" ? "预算必须是数字。" : "Budget must be a number.");
       return;
     }
+    const depositNumber=Number(requiredDeposit||0);
+    if(!/^\d+(\.\d{1,2})?$/.test(requiredDeposit||"0")||depositNumber<0||depositNumber>100000){setStatusMsg(lang==="zh"?"押金必须是0至100000之间、最多两位小数的数字。":"Deposit must be between 0 and 100000 with no more than two decimal places.");return}
+
+    let taskTiming;
+    try { taskTiming = timePayload(taskTime); }
+    catch { setStatusMsg(lang === "zh" ? "请填写有效的起止时间，结束不能早于开始。" : "Enter a valid range. End cannot precede start."); return; }
 
     const { data: inserted, error: insertErr } = await supabase
       .from("demands")
       .insert({
         owner_id: user.id,
+        ...taskTiming,
         title: title.trim(),
         description: description.trim() ? description.trim() : null,
         category: category || t.categories.other,
         budget: budgetNumber,
+        required_deposit: depositNumber,
         status: "active",
     })
-    .select("id, owner_id, title, description, category, budget, status, created_at")
+    .select("id, owner_id, title, description, category, budget, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone")
     .maybeSingle();
 
     if (insertErr || !inserted) {
@@ -254,29 +283,29 @@ export default function DemandsPage() {
     }
 
     // ✅ 关键：不等 realtime，先本地插入，立刻看到
+    if (imageFiles.length) {
+      try {
+        const paths = await uploadPostImages(user.id, "demand", inserted.id, imageFiles);
+        const { error: imageUpdateError } = await supabase.from("demands").update({ image_paths: paths }).eq("id", inserted.id).eq("owner_id", user.id);
+        if (imageUpdateError) throw imageUpdateError;
+        (inserted as any).image_paths = paths;
+      } catch (e) {
+        setStatusMsg((lang === "zh" ? "发布成功，但图片上传失败：" : "Published, but image upload failed: ") + (e instanceof Error ? e.message : "Unknown"));
+      }
+    }
+
     const newRow = normalizeDemand(inserted);
     setItems((prev) => [newRow, ...prev.filter((x) => x.id !== newRow.id)].slice(0, 200));
 
-
-    if (contact.trim()) {
-      const { error: cErr } = await supabase.from("demand_contacts").upsert({
-        demand_id: inserted.id,
-        owner_id: user.id,
-        contact: contact.trim(),
-      });
-      if (cErr) {
-        setStatusMsg((lang === "zh" ? "需求已发布，但联系方式保存失败：" : "Posted, but contact save failed: ") + cErr.message);
-        return;
-      }
-      setContacts((prev) => ({ ...prev, [inserted.id]: contact.trim() }));
-    }
 
     setTitle("");
     setDescription("");
     setCategory(t.categories.other);
     setBudget("");
-    setContact("");
+    setRequiredDeposit("0");
     setStatusMsg(lang === "zh" ? "发布成功 ✅" : "Posted ✅");
+    setTaskTime(ANY_TIME);
+    setShowPublish(false);
   }
 
   async function loadContact(demandId: string) {
@@ -311,36 +340,22 @@ export default function DemandsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 px-6 py-10">
+    <main className="min-h-screen bg-[#080a12] text-zinc-100 px-6 py-10">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{t.demandsHall.title}</h1>
-            <p className="text-zinc-400 mt-2">{t.demandsHall.subtitle}</p>
-            <div className="mt-2 text-sm text-zinc-500">
-              {t.demandsHall.current}
-              {userEmail ? ` ${t.demandsHall.logged}（${userEmail}）` : ` ${t.demandsHall.guest}`}
-              <span className="ml-3 text-xs text-zinc-400">{t.common.realtimeOn}</span>
-            </div>
+            <h1 className="text-3xl font-black tracking-tight">{t.demandsHall.title}</h1>
+            <p className="mt-2 text-zinc-400">{lang === "zh" ? "这里有许多人需要您" : "Many people here need your help."}</p>
           </div>
-
-          <div className="flex items-center gap-4">
-            <a href={`/${lang}`} className="text-zinc-300 hover:text-white underline underline-offset-4">
-              {t.common.backHome}
-            </a>
-            <a href={`/${lang}/me`} className="text-zinc-300 hover:text-white underline underline-offset-4">
-              {t.common.me}
-            </a>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <AuthBox lang={lang} />
+          <button type="button" onClick={() => setShowPublish(true)} className="rounded-xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400">
+            {lang === "zh" ? "发布您的需求" : "Post your request"}
+          </button>
+          <p className="w-full text-center text-xs text-zinc-500 lg:absolute lg:left-1/2 lg:top-1/2 lg:w-auto lg:max-w-sm lg:-translate-x-1/2 lg:-translate-y-1/2">{lang==="zh"?"如需交易担保人，可在聊天中点击“需要担保”。此协调服务无偿。":"If you need a transaction guarantor, select “Request guarantee” in chat. This coordination service is free."}</p>
         </div>
 
         {/* search + filter */}
-        <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_220px_120px]">
+        <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_160px_120px_140px_100px]">
             <input
               className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 outline-none focus:border-indigo-500"
               placeholder={t.demandsHall.searchPlaceholder}
@@ -359,6 +374,10 @@ export default function DemandsPage() {
                 </option>
               ))}
             </select>
+            <select aria-label={lang === "zh" ? "地区" : "Location"} className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-zinc-400" disabled title={lang === "zh" ? "地区功能将在定位系统上线后启用" : "Available when location features launch"}>
+              <option>{lang === "zh" ? "全部地区" : "All locations"}</option>
+            </select>
+            <TaskTimeFields value={timeRange} onChange={setTimeRange} lang={lang} filter />
             <button
               onClick={load}
               className="rounded-xl border border-zinc-700 hover:border-zinc-500 px-4 py-2 text-zinc-100"
@@ -369,10 +388,11 @@ export default function DemandsPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid md:grid-cols-2 gap-6">
+
+        <div className="mt-6">
           {/* publish */}
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
-            <div className="text-lg font-semibold mb-3">{t.demandsHall.publishBlockTitle}</div>
+          {showPublish && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 py-8" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowPublish(false); }}><section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-zinc-700 bg-[#11131e] p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-4"><div className="text-xl font-semibold">{t.demandsHall.publishBlockTitle}</div><button type="button" onClick={() => setShowPublish(false)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-zinc-400 hover:text-white">✕</button></div>
 
             <form onSubmit={submit} className="space-y-3">
               <input
@@ -401,12 +421,14 @@ export default function DemandsPage() {
                 onChange={(e) => setDescription(e.target.value)}
               />
 
-              <input
-                className="w-full rounded-xl bg-zinc-950/40 border border-zinc-800 px-4 py-3 outline-none"
-                placeholder={t.demandsHall.form.contactPh}
-                value={contact}
-                onChange={(e) => setContact(e.target.value)}
-              />
+              <TaskTimeFields value={taskTime} onChange={setTaskTime} lang={lang} />
+              <DepositDraft lang={lang} amount={requiredDeposit} onChange={setRequiredDeposit}/>
+
+              <label className="block rounded-xl border border-dashed border-zinc-700 bg-zinc-950/30 px-4 py-3 text-sm text-zinc-400">
+                {lang === "zh" ? `图片（最多 ${MAX_POST_IMAGES} 张，每张 ≤ 5MB）` : `Images (up to ${MAX_POST_IMAGES}, max 5MB each)`}
+                <input type="file" accept="image/*" multiple onChange={(e) => setImageFiles(Array.from(e.target.files ?? []).slice(0, MAX_POST_IMAGES))} className="mt-2 block w-full text-xs" />
+                {imageFiles.length > 0 && <div className="mt-1 text-xs text-zinc-500">{imageFiles.length}/{MAX_POST_IMAGES}</div>}
+              </label>
 
               <div className="flex gap-3">
                 <input
@@ -429,7 +451,7 @@ export default function DemandsPage() {
             </form>
 
             {statusMsg && <div className="mt-3 text-sm text-zinc-300 whitespace-pre-wrap">{statusMsg}</div>}
-          </section>
+          </section></div>}
 
           {/* list */}
           <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
@@ -443,6 +465,8 @@ export default function DemandsPage() {
               <div className="space-y-3">
                 {filtered.map((it) => (
                   <div key={it.id} className="rounded-xl border border-zinc-800 bg-zinc-950/30 p-4">
+                    <PostImageGallery paths={it.image_paths} compact />
+                    <OwnerBadge userId={it.owner_id} lang={lang}/>
                     <div className="flex items-start justify-between gap-3">
                       <div className="font-semibold">{it.title}</div>
                       <div className="text-xs rounded-full border border-zinc-700 px-2 py-1 text-zinc-200">
@@ -452,30 +476,16 @@ export default function DemandsPage() {
 
                     {it.description && <div className="text-zinc-300 mt-2 whitespace-pre-wrap">{it.description}</div>}
 
+                    <p className="mt-2 text-sm text-violet-300">{formatTaskTime(it, lang)}</p>
                     <div className="text-zinc-500 text-sm mt-2 flex gap-3 flex-wrap">
                       <span>{new Date(it.created_at).toLocaleString()}</span>
                       {it.budget != null && <span>¥ {it.budget}</span>}
+                      <span className="text-amber-300">{lang==="zh"?`押金 £${it.required_deposit.toFixed(2)}`:`Deposit £${it.required_deposit.toFixed(2)}`}</span>
                       <a className="text-zinc-300 hover:text-white underline" href={`/${lang}/demands/${it.id}`}>
                         {t.common.details}
                       </a>
                     </div>
 
-                    {contacts[it.id] ? (
-                      <div className="mt-2 text-sm text-zinc-200">
-                        {t.demandsHall.item.contact}
-                        <span className="font-semibold">{contacts[it.id]}</span>
-                        <span className="ml-2 text-xs text-zinc-500">{t.demandsHall.item.contactRealtime}</span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => loadContact(it.id)}
-                        className="mt-2 text-sm text-zinc-300 hover:text-white underline"
-                        disabled={!!contactLoading[it.id]}
-                      >
-                        {contactLoading[it.id] ? t.common.loading : t.demandsHall.item.viewContact}
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
