@@ -1,11 +1,12 @@
 "use client";
 import { formatTaskTime, TaskTime } from "@/lib/taskTime";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import PostImageGallery from "@/app/components/PostImageGallery";
 import ReportButton from "@/app/components/ReportButton";
 import OwnerBadge from "@/app/components/OwnerBadge";
+import AdminPinButton, { PinnedTag } from "@/app/components/AdminPin";
 import { supabase } from "@/lib/supabaseClient";
 import { getT, safeLang } from "@/lib/i18n";
 
@@ -36,34 +37,6 @@ type Conversation = {
   last_message_text: string | null;
 };
 
-type Review = {
-  id: string;
-  rating: number;
-  text: string | null;
-  created_at: string;
-};
-
-type OwnerCard = {
-  ownerId: string;
-  bio: string | null;
-  dealsCompleted: number; // 用 reviews 数量作为“成交/评价数”
-  reviews: Review[];
-};
-
-function StarRow({ rating }: { rating: number }) {
-  const r = Math.max(1, Math.min(5, rating));
-  return (
-    <div className="flex items-center gap-1">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <span key={i} className={i < r ? "text-amber-300" : "text-zinc-700"}>
-          ★
-        </span>
-      ))}
-      <span className="ml-2 text-xs text-zinc-500">{r}/5</span>
-    </div>
-  );
-}
-
 export default function ServiceDetailPage() {
   const params = useParams<{ lang: string; id: string }>();
   const lang = safeLang(params?.lang);
@@ -80,14 +53,6 @@ export default function ServiceDetailPage() {
   const [loadingContact, setLoadingContact] = useState(false);
 
   const [startingChat, setStartingChat] = useState(false);
-
-  const [ownerCard, setOwnerCard] = useState<OwnerCard | null>(null);
-  const [ownerCardLoading, setOwnerCardLoading] = useState(false);
-  const [ownerCardErr, setOwnerCardErr] = useState<string>("");
-
-  // realtime channel
-  const rtChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const rtOwnerIdRef = useRef<string | null>(null);
 
   // auth
   useEffect(() => {
@@ -109,12 +74,10 @@ export default function ServiceDetailPage() {
     const run = async () => {
       setStatus("");
       setItem(null);
-      setOwnerCard(null);
-      setOwnerCardErr("");
 
       const { data, error } = await supabase
         .from("services")
-        .select("id, owner_id, title, description, category, price, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone")
+        .select("id, owner_id, title, description, category, price, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone, pinned_at")
         .eq("id", id)
         .maybeSingle();
 
@@ -126,89 +89,11 @@ export default function ServiceDetailPage() {
       const s = (data as Service) ?? null;
       setItem(s);
 
-      if (s?.owner_id) {
-        await loadOwnerCard(s.owner_id);
-      }
     };
 
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, lang]);
-
-  async function loadOwnerCard(ownerId: string) {
-    setOwnerCardLoading(true);
-    setOwnerCardErr("");
-
-    try {
-      const pReq = supabase.from("profiles").select("id, bio").eq("id", ownerId).maybeSingle();
-
-      const cReq = supabase
-        .from("reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("reviewee_id", ownerId);
-
-      const rReq = supabase
-        .from("reviews")
-        .select("id, rating, text, created_at")
-        .eq("reviewee_id", ownerId)
-        .order("created_at", { ascending: false })
-        .limit(20);
-
-      const [pRes, cRes, rRes] = await Promise.all([pReq, cReq, rReq]);
-
-      if (pRes.error) throw new Error((lang === "zh" ? "读取发布者信息失败：" : "Failed to load profile: ") + pRes.error.message);
-      if (cRes.error) throw new Error((lang === "zh" ? "读取成交次数失败：" : "Failed to load count: ") + cRes.error.message);
-      if (rRes.error) throw new Error((lang === "zh" ? "读取评价失败：" : "Failed to load reviews: ") + rRes.error.message);
-
-      setOwnerCard({
-        ownerId,
-        bio: (pRes.data as any)?.bio ?? null,
-        dealsCompleted: cRes.count ?? 0,
-        reviews: ((rRes.data as Review[]) ?? []) as Review[],
-      });
-    } catch (e: any) {
-      setOwnerCardErr(e?.message ?? (lang === "zh" ? "加载发布者名片失败" : "Failed to load owner card"));
-    } finally {
-      setOwnerCardLoading(false);
-    }
-  }
-
-  // realtime owner card (profiles + reviews)
-  useEffect(() => {
-    const ownerId = item?.owner_id;
-    if (!ownerId) return;
-
-    // owner 变了就重建订阅
-    if (rtOwnerIdRef.current === ownerId) return;
-    rtOwnerIdRef.current = ownerId;
-
-    // 清理旧订阅
-    if (rtChannelRef.current) {
-      supabase.removeChannel(rtChannelRef.current);
-      rtChannelRef.current = null;
-    }
-
-    const ch = supabase
-      .channel(`rt-owner-card-${ownerId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${ownerId}` }, () => {
-        loadOwnerCard(ownerId);
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "reviews", filter: `reviewee_id=eq.${ownerId}` }, () => {
-        loadOwnerCard(ownerId);
-      })
-      .subscribe();
-
-    rtChannelRef.current = ch;
-
-    return () => {
-      if (rtChannelRef.current) {
-        supabase.removeChannel(rtChannelRef.current);
-        rtChannelRef.current = null;
-      }
-      rtOwnerIdRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item?.owner_id]);
 
   async function loadContact() {
     setStatus("");
@@ -331,6 +216,7 @@ export default function ServiceDetailPage() {
             <div className="text-zinc-400">{status || (lang === "zh" ? "找不到这条服务（可能已被删除或隐藏）。" : "Service not found.")}</div>
           ) : (
             <>
+              <div className="mb-2 flex flex-wrap items-center gap-2 empty:hidden"><PinnedTag pinnedAt={(item as any).pinned_at} lang={lang}/><AdminPinButton kind="service" id={item.id} pinnedAt={(item as any).pinned_at} lang={lang} onChanged={(value)=>setItem(prev=>prev?({...prev,pinned_at:value} as any):prev)}/></div>
               <OwnerBadge userId={item.owner_id} lang={lang} />
               <div className="flex items-start justify-between gap-3">
                 <div className="text-2xl font-bold">{item.title}</div>
@@ -353,57 +239,8 @@ export default function ServiceDetailPage() {
 
               <div className="mt-4 text-sm text-zinc-500 flex gap-4 flex-wrap">
                 <span>{new Date(item.created_at).toLocaleString()}</span>
-                {item.price != null && <span>{lang === "zh" ? "价格" : "Price"} ¥ {item.price}</span>}
+                {item.price != null && <span>{lang === "zh" ? "价格" : "Price"} £{Number(item.price).toFixed(2)}</span>}
                 <span className="text-amber-300">{lang==="zh"?"任务押金":"Task deposit"} £{Number(item.required_deposit??0).toFixed(2)}</span>
-              </div>
-
-              {/* owner card */}
-              <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950/30 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-semibold">{lang === "zh" ? "发布者信息" : "Owner info"}</div>
-                  {ownerCard && (
-                    <div className="text-xs rounded-full border border-zinc-700 px-3 py-1 text-zinc-200">
-                      {lang === "zh" ? `成交/评价 ${ownerCard.dealsCompleted} 次` : `Reviews ${ownerCard.dealsCompleted}`}
-                    </div>
-                  )}
-                </div>
-
-                {ownerCardLoading ? (
-                  <div className="mt-3 text-sm text-zinc-400">{lang === "zh" ? "加载发布者名片中..." : "Loading owner card..."}</div>
-                ) : ownerCardErr ? (
-                  <div className="mt-3 text-sm text-amber-300 whitespace-pre-wrap">{ownerCardErr}</div>
-                ) : !ownerCard ? (
-                  <div className="mt-3 text-sm text-zinc-400">{lang === "zh" ? "暂无发布者信息。" : "No owner info."}</div>
-                ) : (
-                  <>
-                    <div className="mt-3 text-sm text-zinc-300">
-                      {lang === "zh" ? "简介：" : "Bio: "}{" "}
-                      <span className="text-zinc-100">{ownerCard.bio?.trim() ? ownerCard.bio : (lang === "zh" ? "暂无简介" : "No bio")}</span>
-                    </div>
-
-                    <div className="mt-4">
-                      <div className="text-sm text-zinc-400 mb-2">
-                        {lang === "zh" ? `评价（${ownerCard.reviews.length}）` : `Reviews (${ownerCard.reviews.length})`}
-                      </div>
-
-                      {ownerCard.reviews.length === 0 ? (
-                        <div className="text-sm text-zinc-500">{lang === "zh" ? "暂无评价。" : "No reviews yet."}</div>
-                      ) : (
-                        <div className="grid gap-3">
-                          {ownerCard.reviews.map((r) => (
-                            <div key={r.id} className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
-                              <StarRow rating={r.rating} />
-                              {r.text?.trim() && (
-                                <div className="mt-2 text-sm text-zinc-200 whitespace-pre-wrap">{r.text}</div>
-                              )}
-                              <div className="mt-2 text-xs text-zinc-500">{new Date(r.created_at).toLocaleString()}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
               </div>
 
               {/* chat */}
@@ -420,9 +257,8 @@ export default function ServiceDetailPage() {
                   disabled={startingChat}
                   className="rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 text-zinc-950 font-semibold px-5 py-2"
                 >
-                  {startingChat ? (lang === "zh" ? "进入中..." : "Opening...") : (lang === "zh" ? "发起聊天 / 去对话框" : "Start chat")}
+                  {startingChat ? (lang === "zh" ? "进入中..." : "Opening...") : (lang === "zh" ? "发起聊天" : "Start chat")}
                 </button>
-                <div className="mt-2 text-xs text-zinc-500">{lang === "zh" ? "会自动跳转到 /me 并打开对应会话。" : "Will redirect to /me and open the conversation."}</div>
               </div>
             </>
           )}
