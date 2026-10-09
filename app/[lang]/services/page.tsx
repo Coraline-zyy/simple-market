@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { ALL_VALUE, getT, safeLang } from "@/lib/i18n";
 import { useParams } from "next/navigation";
 import OwnerBadge from "@/app/components/OwnerBadge";
+import AdminPinButton, { PinnedTag, pinnedFirst } from "@/app/components/AdminPin";
 import TaskTimeFields from "@/app/components/TaskTimeFields";
 import { ANY_TIME, TimeRange, timePayload, overlapsTime, formatTaskTime } from "@/lib/taskTime";
 
@@ -26,6 +27,7 @@ type Service = {
   task_starts_at: string | null;
   task_ends_at: string | null;
   task_date_only: boolean;
+  pinned_at?: string | null;
 };
 
 function normalizeService(row: any): Service {
@@ -114,8 +116,9 @@ export default function ServicesPage() {
     setStatus("");
     const { data, error } = await supabase
       .from("services")
-      .select("id, owner_id, title, description, category, price, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone")
+      .select("id, owner_id, title, description, category, price, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone, pinned_at")
       .eq("status", "active")
+      .order("pinned_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -224,13 +227,14 @@ export default function ServicesPage() {
 
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
-    return items.filter((it) => {
+    const list = items.filter((it) => {
       const hitKw =
         !kw || it.title.toLowerCase().includes(kw) || (it.description ?? "").toLowerCase().includes(kw);
       const hitCat = filterCategory === ALL_VALUE || it.category === filterCategory;
       const hitTime = overlapsTime(it, timeRange);
       return hitKw && hitCat && hitTime;
     });
+    return pinnedFirst(list);
   }, [items, q, filterCategory, timeRange]);
 
   async function submit(e: React.FormEvent) {
@@ -353,7 +357,7 @@ export default function ServicesPage() {
           <button type="button" onClick={() => setShowPublish(true)} className="rounded-xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400">
             {lang === "zh" ? "发布您的服务" : "Post your service"}
           </button>
-          <p className="w-full text-center text-xs text-zinc-500 lg:absolute lg:left-1/2 lg:top-1/2 lg:w-auto lg:max-w-sm lg:-translate-x-1/2 lg:-translate-y-1/2">{lang==="zh"?"如需交易担保人，可在聊天中点击“需要担保”。此协调服务无偿。":"If you need a transaction guarantor, select “Request guarantee” in chat. This coordination service is free."}</p>
+          <p className="w-full text-center text-xs font-medium text-white lg:absolute lg:left-1/2 lg:top-1/2 lg:w-auto lg:max-w-sm lg:-translate-x-1/2 lg:-translate-y-1/2">{lang==="zh"?"如需交易担保或押金支付协助，请在聊天中点击“需要担保”，由管理员介入协调。":"For transaction guarantees or help arranging a deposit payment, select “Request guarantee” in chat for administrator assistance."}</p>
         </div>
 
         {/* search + filter */}
@@ -469,7 +473,8 @@ export default function ServicesPage() {
             ) : (
               <div className="space-y-3">
                 {filtered.map((it) => (
-                  <div key={it.id} className="rounded-xl border border-zinc-800 bg-zinc-950/30 p-4">
+                  <div key={it.id} className={`rounded-xl border p-4 ${it.pinned_at ? "border-amber-400/40 bg-amber-500/[0.04]" : "border-zinc-800 bg-zinc-950/30"}`}>
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 empty:hidden"><PinnedTag pinnedAt={it.pinned_at} lang={lang}/><AdminPinButton kind="service" id={it.id} pinnedAt={it.pinned_at} lang={lang} onChanged={(value)=>setItems(prev=>prev.map(x=>x.id===it.id?{...x,pinned_at:value}:x))}/></div>
                     <PostImageGallery paths={it.image_paths} compact />
                     <OwnerBadge userId={it.owner_id} lang={lang}/>
                     <div className="flex items-start justify-between gap-3">
@@ -484,7 +489,7 @@ export default function ServicesPage() {
                     <p className="mt-2 text-sm text-violet-300">{formatTaskTime(it, lang)}</p>
                     <div className="text-zinc-500 text-sm mt-2 flex gap-3 flex-wrap">
                       <span>{new Date(it.created_at).toLocaleString()}</span>
-                      {it.price != null && <span>¥ {it.price}</span>}
+                      {it.price != null && <span>£{it.price}</span>}
                       <span className="text-amber-300">{lang==="zh"?`押金 £${it.required_deposit.toFixed(2)}`:`Deposit £${it.required_deposit.toFixed(2)}`}</span>
                       <a className="text-zinc-300 hover:text-white underline" href={`/${lang}/services/${it.id}`}>
                         {t.common.details}
