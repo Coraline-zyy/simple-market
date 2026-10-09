@@ -15,6 +15,7 @@ export default function SiteFooter({ lang }: { lang: string }) {
       <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-2xl leading-6"><div className="font-medium text-zinc-300">{t.home.footerLine1}</div><p className="mt-1 text-zinc-500">{t.home.footerLine2}</p></div>
         <div className="flex shrink-0 flex-wrap gap-6">
+          <Link href={`/${L}/app`} className="font-medium text-violet-300 underline decoration-violet-500/50 underline-offset-4 transition hover:text-white">{L==="zh"?"下载 App":"Get the app"}</Link>
           <Link href={`/${L}/account`} className="font-medium text-zinc-300 underline decoration-zinc-600 underline-offset-4 transition hover:text-white">{t.common.account}</Link>
           <button type="button" onClick={()=>window.dispatchEvent(new Event(OPEN_AUTHOR_NOTE_EVENT))} className="font-medium text-zinc-300 underline decoration-zinc-600 underline-offset-4 transition hover:text-white">{L==="zh"?"作者的话":"Creator's note"}</button>
           <Link href={`/${L}/disclaimer`} className="font-medium text-zinc-300 underline decoration-zinc-600 underline-offset-4 transition hover:text-white">{t.common.disclaimerLink}</Link>

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import PostImageGallery from "@/app/components/PostImageGallery";
 import ReportButton from "@/app/components/ReportButton";
 import OwnerBadge from "@/app/components/OwnerBadge";
+import AdminPinButton, { PinnedTag } from "@/app/components/AdminPin";
 import { supabase } from "@/lib/supabaseClient";
 import { getT, safeLang } from "@/lib/i18n";
 
@@ -74,7 +75,7 @@ export default function DemandDetailPage() {
 
       const { data, error } = await supabase
         .from("demands")
-        .select("id, owner_id, title, description, category, budget, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone")
+        .select("id, owner_id, title, description, category, budget, required_deposit, status, created_at, image_paths, task_starts_at, task_ends_at, task_date_only, task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone, pinned_at")
         .eq("id", id)
         .maybeSingle();
 
@@ -208,6 +209,7 @@ export default function DemandDetailPage() {
             <div className="text-zinc-400">{status || (lang === "zh" ? "找不到这条需求（可能已被删除或隐藏）。" : "Demand not found.")}</div>
           ) : (
             <>
+              <div className="mb-2 flex flex-wrap items-center gap-2 empty:hidden"><PinnedTag pinnedAt={(item as any).pinned_at} lang={lang}/><AdminPinButton kind="demand" id={item.id} pinnedAt={(item as any).pinned_at} lang={lang} onChanged={(value)=>setItem(prev=>prev?({...prev,pinned_at:value} as any):prev)}/></div>
               <OwnerBadge userId={item.owner_id} lang={lang} />
               <div className="flex items-start justify-between gap-3">
                 <div className="text-2xl font-bold">{item.title}</div>
@@ -230,7 +232,7 @@ export default function DemandDetailPage() {
 
               <div className="mt-4 text-sm text-zinc-500 flex gap-4 flex-wrap">
                 <span>{new Date(item.created_at).toLocaleString()}</span>
-                {item.budget != null && <span>{lang === "zh" ? "预算" : "Budget"} ¥ {item.budget}</span>}
+                {item.budget != null && <span>{lang === "zh" ? "预算" : "Budget"} £{Number(item.budget).toFixed(2)}</span>}
                 <span className="text-amber-300">{lang==="zh"?"任务押金":"Task deposit"} £{Number(item.required_deposit??0).toFixed(2)}</span>
               </div>
 
@@ -247,11 +249,8 @@ export default function DemandDetailPage() {
                   disabled={startingChat}
                   className="rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 text-zinc-950 font-semibold px-5 py-2"
                 >
-                  {startingChat ? (lang === "zh" ? "进入中..." : "Opening...") : (lang === "zh" ? "发起聊天 / 去对话框" : "Start chat")}
+                  {startingChat ? (lang === "zh" ? "进入中..." : "Opening...") : (lang === "zh" ? "发起聊天" : "Start chat")}
                 </button>
-                <div className="mt-2 text-xs text-zinc-500">
-                  {lang === "zh" ? "会自动跳转到 /me 并打开对应会话。" : "Will redirect to /me and open the conversation."}
-                </div>
               </div>
             </>
           )}

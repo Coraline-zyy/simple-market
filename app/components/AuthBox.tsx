@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import {loginErrorMessage} from "@/lib/authErrors";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getT, safeLang } from "@/lib/i18n";
@@ -13,6 +14,7 @@ export default function AuthBox({ lang, initialEmail = "", redirectAfterLogin, f
   const params = useParams<{ lang?: string }>();
   const L = useMemo(() => safeLang(lang ?? params?.lang), [lang, params]);
   const t = useMemo(() => getT(L), [L]);
+  const authRequestLock=useRef(false);
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -45,19 +47,18 @@ export default function AuthBox({ lang, initialEmail = "", redirectAfterLogin, f
   }, []);
 
   async function signInWithPassword() {
+    if(authRequestLock.current)return;
     setMsg("");
     const e = email.trim();
     if (!e) return setMsg(t.auth.msgNeedEmail);
     if (!password) return setMsg(t.auth.msgNeedPassword);
+    authRequestLock.current=true;
     setBusy(true);
     try {
     const { error } = await supabase.auth.signInWithPassword({ email: e, password });
     setBusy(false);
     if (error) {
-      const wrongCredentials = /invalid login credentials/i.test(error.message);
-      return setMsg(wrongCredentials
-        ? (L === "zh" ? "邮箱或密码错误，请重新输入。" : "Incorrect email or password. Please try again.")
-        : t.auth.msgPasswordLoginFail + error.message);
+      return setMsg(loginErrorMessage(error,L,t.auth.msgPasswordLoginFail));
     }
     if (rememberDevice) {
       localStorage.setItem("simple-market:session-mode", "remembered");
@@ -72,14 +73,17 @@ export default function AuthBox({ lang, initialEmail = "", redirectAfterLogin, f
     } catch (error) {
       setMsg(L === "zh" ? "请求失败或超时，请检查网络后重试。" : "Request failed or timed out. Check your connection and try again.");
     } finally {
+      authRequestLock.current=false;
       setBusy(false);
     }
   }
   async function registerWithPassword() {
+    if(authRequestLock.current)return;
     setMsg("");
     const e = email.trim();
     if (!e) return setMsg(t.auth.msgNeedEmail);
     if (password.length < 6) return setMsg(L === "zh" ? "密码至少需要 6 位。" : "Password must be at least 6 characters.");
+    authRequestLock.current=true;
     setBusy(true);
     try {
     const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
@@ -111,13 +115,16 @@ export default function AuthBox({ lang, initialEmail = "", redirectAfterLogin, f
     } catch (error) {
       setMsg(L === "zh" ? "请求失败或超时，请检查网络后重试。" : "Request failed or timed out. Check your connection and try again.");
     } finally {
+      authRequestLock.current=false;
       setBusy(false);
     }
   }
   async function sendLink() {
+    if(authRequestLock.current)return;
     setMsg("");
     const e = email.trim();
     if (!e) return setMsg(t.auth.msgNeedEmail);
+    authRequestLock.current=true;
     setBusy(true);
     try {
     const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
@@ -130,17 +137,20 @@ export default function AuthBox({ lang, initialEmail = "", redirectAfterLogin, f
     } catch (error) {
       setMsg(L === "zh" ? "请求失败或超时，请检查网络后重试。" : "Request failed or timed out. Check your connection and try again.");
     } finally {
+      authRequestLock.current=false;
       setBusy(false);
     }
   }
   async function resendConfirmation() {
+    if(authRequestLock.current)return;
     const e=email.trim();
     if(!e)return setMsg(t.auth.msgNeedEmail);
+    authRequestLock.current=true;
     setBusy(true);setMsg("");
     try{const base=process.env.NEXT_PUBLIC_SITE_URL||window.location.origin;
     const r=await supabase.auth.resend({type:"signup",email:e,options:{emailRedirectTo:`${base}/${L}/auth/callback`}});
     setMsg(r.error?(L==="zh"?"重发失败：":"Resend failed: ")+r.error.message:(L==="zh"?"如果该邮箱有待确认的注册申请，我们已请求重新发送确认链接。请检查垃圾邮件。":"If this email has a pending registration, a new confirmation link has been requested. Check your spam folder."));
-    }catch{setMsg(L==="zh"?"请求超时，请稍后重试。":"Request timed out. Please try again later.")}finally{setBusy(false)}
+    }catch{setMsg(L==="zh"?"请求超时，请稍后重试。":"Request timed out. Please try again later.")}finally{authRequestLock.current=false;setBusy(false)}
   }
   async function signOut() {
     setMsg("");
@@ -151,6 +161,8 @@ export default function AuthBox({ lang, initialEmail = "", redirectAfterLogin, f
   }
 
   async function forgetRememberedAccount() {
+    if(authRequestLock.current)return;
+    authRequestLock.current=true;
     setBusy(true);
     try {
     await supabase.auth.signOut();
@@ -160,6 +172,7 @@ export default function AuthBox({ lang, initialEmail = "", redirectAfterLogin, f
     } catch (error) {
       setMsg(L === "zh" ? "请求失败或超时，请检查网络后重试。" : "Request failed or timed out. Check your connection and try again.");
     } finally {
+      authRequestLock.current=false;
       setBusy(false);
     }
   }

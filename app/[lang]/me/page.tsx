@@ -1,4 +1,5 @@
 "use client";
+import {depositPresentation} from "@/lib/depositRole";
 import TaskTimeFields from "@/app/components/TaskTimeFields";
 import { TaskTime, TimeRange, ANY_TIME, timePayload, formatTaskTime, rangeFromTask } from "@/lib/taskTime";
 import WorkflowPanel from "@/app/components/WorkflowPanel";
@@ -10,6 +11,10 @@ import { supabase } from "@/lib/supabaseClient";
 import { useParams, useSearchParams } from "next/navigation";
 import { useUserOnline } from "@/app/components/PresenceProvider";
 import {AVATARS_BUCKET,publicStorageUrl} from "@/lib/media";
+import PrivateChatPanel, { PrivateThreadInfo } from "@/app/components/PrivateChatPanel";
+import { announceUnreadChanged, notifyNewMessage } from "@/lib/notify";
+
+type InboxRow = { kind: "task" | "direct" | "admin"; thread_id: string; other_id: string; other_username: string | null; other_avatar_path: string | null; title: string | null; from_admin: boolean; last_message: string | null; last_message_at: string | null; unread: number };
 
 type Service = TaskTime & {
   id: string;
@@ -46,6 +51,7 @@ type Conversation = {
   other_avatar_path?:string|null;
   task_title?:string|null;
   required_deposit?:number;
+  task_owner_id?:string|null;
 };
 
 type Message = {
@@ -126,6 +132,7 @@ export default function MePage() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab"); // "chat" | "posts" | null
   const convFromUrl = searchParams.get("conv"); // conversation id | null
+  const dmFromUrl = searchParams.get("dm"); // "direct:<id>" | "admin:<id>" | null
 
   const initialTab = (tabFromUrl === "chat" ? "chat" : "posts") as "posts" | "chat";
   const initialConv = convFromUrl;
@@ -165,7 +172,11 @@ export default function MePage() {
   // conversations
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [convLoading, setConvLoading] = useState(false);
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(initialConv);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(dmFromUrl ? null : initialConv);
+  // unified inbox (task chats + private messages + administrator messages)
+  const [inbox, setInbox] = useState<InboxRow[] | null>(null);
+  const [inboxError, setInboxError] = useState("");
+  const [selectedDm, setSelectedDm] = useState<string | null>(dmFromUrl);
 
   // messages
   const [msgs, setMsgs] = useState<Message[]>([]);
@@ -177,6 +188,9 @@ export default function MePage() {
   const [guaranteeAmount,setGuaranteeAmount]=useState("");
   const [reviewOpen,setReviewOpen]=useState(false);
   const messagesEndRef=useRef<HTMLDivElement|null>(null);
+  const selectedView = useRef({ id: selectedConvId, tab, dm: selectedDm });
+  selectedView.current = { id: selectedConvId, tab, dm: selectedDm };
+  const messageSequence = useRef(0);
 
   // deal & review
   const [deal, setDeal] = useState<Deal | null>(null);
@@ -200,8 +214,9 @@ export default function MePage() {
     const nextConv = convFromUrl;
 
     setTab((prev) => (prev === nextTab ? prev : nextTab));
-    setSelectedConvId((prev) => (prev === nextConv ? prev : nextConv));
-  }, [tabFromUrl, convFromUrl]);
+    if (dmFromUrl) { setSelectedDm(dmFromUrl); setSelectedConvId(null); }
+    else { setSelectedDm(null); setSelectedConvId((prev) => (prev === nextConv ? prev : nextConv)); }
+  }, [tabFromUrl, convFromUrl, dmFromUrl]);
 
   // auth state
   useEffect(() => {
@@ -411,30 +426,46 @@ export default function MePage() {
 
     if (error) return;
     const rows=(data as Conversation[])??[],otherIds=[...new Set(rows.map(c=>c.owner_id===uid?c.other_id:c.owner_id))],serviceIds=rows.filter(c=>c.post_type==="service").map(c=>c.post_id),demandIds=rows.filter(c=>c.post_type==="demand").map(c=>c.post_id);
-    const [profiles,services,demands]=await Promise.all([otherIds.length?supabase.from("profiles").select("id,username,avatar_path").in("id",otherIds):Promise.resolve({data:[]}),serviceIds.length?supabase.from("services").select("id,title,required_deposit").in("id",serviceIds):Promise.resolve({data:[]}),demandIds.length?supabase.from("demands").select("id,title,required_deposit").in("id",demandIds):Promise.resolve({data:[]})]);
+    const [profiles,services,demands]=await Promise.all([otherIds.length?supabase.from("profiles").select("id,username,avatar_path").in("id",otherIds):Promise.resolve({data:[]}),serviceIds.length?supabase.from("services").select("id,owner_id,title,required_deposit").in("id",serviceIds):Promise.resolve({data:[]}),demandIds.length?supabase.from("demands").select("id,owner_id,title,required_deposit").in("id",demandIds):Promise.resolve({data:[]})]);
     const profileMap=new Map((profiles.data??[]).map((p:any)=>[p.id,p])),taskMap=new Map([...(services.data??[]),...(demands.data??[])].map((p:any)=>[p.id,p]));
-    setConvs(rows.map(c=>{const p:any=profileMap.get(c.owner_id===uid?c.other_id:c.owner_id),task:any=taskMap.get(c.post_id);return {...c,other_username:p?.username??null,other_avatar_path:p?.avatar_path??null,task_title:task?.title??null,required_deposit:Number(task?.required_deposit??0)}}));
+    setConvs(rows.map(c=>{const p:any=profileMap.get(c.owner_id===uid?c.other_id:c.owner_id),task:any=taskMap.get(c.post_id);return {...c,other_username:p?.username??null,other_avatar_path:p?.avatar_path??null,task_title:task?.title??null,task_owner_id:task?.owner_id??null,required_deposit:Number(task?.required_deposit??0)}}));
+  }
+
+  async function loadInbox() {
+    const { data, error } = await supabase.rpc("get_my_chat_inbox");
+    if (error) { setInbox(null); setInboxError(lang==="zh"?"聊天加载失败。请确认已执行本次 SQL，并检查连接。":"Chats could not load. Check the connection and install this update’s SQL."); return; }
+    setInboxError("");
+    const rows = ((data ?? []) as any[]).map((r) => ({ ...r, unread: Number(r.unread ?? 0) })) as InboxRow[];
+    rows.sort((a, b) => new Date(b.last_message_at ?? 0).getTime() - new Date(a.last_message_at ?? 0).getTime());
+    setInbox(rows);
   }
 
   async function loadMessages(conversationId: string) {
-    setMsgLoading(true);
+    const request = ++messageSequence.current;
+    const initial = selectedView.current.id !== conversationId || !msgs.length;
+    if (initial) setMsgLoading(true);
     const { data, error } = await supabase
       .from("messages")
       .select("id, conversation_id, sender_id, content, created_at, read_at")
       .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false }).order("id", { ascending: false })
       .limit(500);
+    if (request !== messageSequence.current || selectedView.current.id !== conversationId) return;
     setMsgLoading(false);
 
     if (error) {
       setStatusMsg(t.me.status.openConvFail);
       return;
     }
-    const loaded=(data as any[])??[];setMsgs(loaded);
+    const loaded=((data as any[])??[]).reverse();setMsgs(loaded);
     const senders=[...new Set(loaded.map(message=>message.sender_id))] as string[];
     const checks=await Promise.all(senders.map(async sender=>({sender,result:await supabase.rpc("is_market_admin_user",{p_user:sender})})));
+    if (request !== messageSequence.current || selectedView.current.id !== conversationId) return;
     setAdminSenders(checks.filter(check=>!check.result.error&&check.result.data===true).map(check=>check.sender));
-    await supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
+    if (document.visibilityState !== "visible" || selectedView.current.tab !== "chat" || selectedView.current.dm) return;
+    await supabase.rpc("mark_loaded_chat_read", { p_kind: "task", p_thread: conversationId, p_ids: loaded.map(m => m.id) });
+    announceUnreadChanged();
+    void loadInbox();
   }
 
   async function loadDealAndSideInfo(conversationId: string, uid: string) {
@@ -580,11 +611,11 @@ export default function MePage() {
     setSending(true);
 
     // ✅ messages 表结构是 conversation_id，不是 target_id/target_type
-    const { error } = await supabase.from("messages").insert({
+    const { data: sentRow, error } = await supabase.from("messages").insert({
       conversation_id: selectedConvId,
       sender_id: userId,
       content: text,
-    });
+    }).select("id").single();
 
     setSending(false);
 
@@ -592,6 +623,7 @@ export default function MePage() {
       setStatusMsg(t.me.status.sendFail + error.message);
       return;
     }
+    notifyNewMessage("task", sentRow?.id);
     setSendText("");
     await loadMessages(selectedConvId);
   }
@@ -603,8 +635,8 @@ export default function MePage() {
       const request=await supabase.rpc("request_guarantee",{p_conversation:selectedConvId,p_amount:amount});
       if(request.error){setStatusMsg(request.error.message);return}
     }
-    setSending(true);const {error}=await supabase.from("messages").insert({conversation_id:selectedConvId,sender_id:userId,content});setSending(false);
-    if(error){setStatusMsg(error.message);return}setGuaranteeOpen(false);await loadMessages(selectedConvId);
+    setSending(true);const {data:sentRow,error}=await supabase.from("messages").insert({conversation_id:selectedConvId,sender_id:userId,content}).select("id").single();setSending(false);
+    if(error){setStatusMsg(error.message);return}notifyNewMessage("task",sentRow?.id);setGuaranteeOpen(false);await loadMessages(selectedConvId);
   }
 
   async function submitReview() {
@@ -673,6 +705,22 @@ export default function MePage() {
     loadBio(userId);
     loadMyPosts(userId);
     loadConversations(userId);
+    void loadInbox();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // ---------- keep the unified inbox (and unread numbers) fresh ----------
+  useEffect(() => {
+    if (!userId) return;
+    const timer = setInterval(() => void loadInbox(), 8000);
+    const refresh = () => void loadInbox();
+    window.addEventListener("youqiu:unread-changed", refresh);
+    const ch = supabase
+      .channel("rt_inbox_me")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages" }, refresh)
+      .subscribe();
+    return () => { clearInterval(timer); window.removeEventListener("youqiu:unread-changed", refresh); supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
@@ -701,6 +749,14 @@ export default function MePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConvId, userId]);
 
+  useEffect(() => {
+    if (!selectedConvId || tab !== "chat" || selectedDm) return;
+    const refresh = () => { if (document.visibilityState === "visible") void loadMessages(selectedConvId); };
+    refresh(); const timer = setInterval(refresh, 5000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, [selectedConvId, userId, tab, selectedDm]);
+
   // ✅ realtime messages（随 selectedConvId 变化重新订阅）
   useEffect(() => {
     if (!selectedConvId) return;
@@ -715,7 +771,7 @@ export default function MePage() {
           if (prev.some((x) => x.id === m.id)) return prev.map(x=>x.id===m.id?m as Message:x);
           return [...prev, m as Message];
         });
-        if(m.sender_id!==userId) void supabase.rpc("mark_conversation_read",{p_conversation_id:selectedConvId});
+        if(m.sender_id!==userId && document.visibilityState==="visible" && selectedView.current.tab==="chat" && !selectedView.current.dm) void supabase.rpc("mark_loaded_chat_read",{p_kind:"task",p_thread:selectedConvId,p_ids:[m.id]}).then(()=>{announceUnreadChanged();void loadInbox()});
       })
       .subscribe();
 
@@ -724,7 +780,7 @@ export default function MePage() {
     };
   }, [selectedConvId]);
 
-  useEffect(()=>{messagesEndRef.current?.scrollIntoView({block:"end"})},[msgs,selectedConvId]);
+  useEffect(()=>{messagesEndRef.current?.scrollIntoView({block:"end"})},[msgs.at(-1)?.id,selectedConvId]);
   useEffect(()=>{if(deal?.workflow_status==="done"&&!myReview)setReviewOpen(true)},[deal?.workflow_status,myReview,selectedConvId]);
 
   // ✅ realtime deal updates（随 selectedConvId 变化重新订阅）
@@ -747,6 +803,7 @@ export default function MePage() {
 
   const canFull = !!userId && !needEmail && !isAnon;
   const selectedConversation=convs.find(c=>c.id===selectedConvId),selectedAvatar=publicStorageUrl(AVATARS_BUCKET,selectedConversation?.other_avatar_path),selectedName=selectedConversation?.other_username||(lang==="zh"?"未设置ID":"No ID"),averageRating=otherReviews.length?otherReviews.reduce((sum,r)=>sum+r.rating,0)/otherReviews.length:null;
+  const depositView=depositPresentation(userId,selectedConversation?.task_owner_id,selectedConversation?.required_deposit,lang);
   const selectedWorkflow=deal?.workflow_status??"chatting",selectedIsOwner=!!(selectedConversation&&userId&&selectedConversation.owner_id===userId),myCollaborationConfirmed=!!deal&&(selectedIsOwner?deal.collaboration_owner_confirmed:deal.collaboration_other_confirmed),myCompletionConfirmed=!!deal&&(selectedIsOwner?deal.completion_owner_confirmed:deal.completion_other_confirmed),selectedFinished=selectedWorkflow==="done",selectedLocked=selectedWorkflow==="arbitration";
   const workflowLabel=lang==="zh"
     ? selectedWorkflow==="pending"?(myCollaborationConfirmed?"聊天 · 等待对方确认":"聊天 · 对方已确认")
@@ -763,7 +820,14 @@ export default function MePage() {
   const guaranteed=latestGuarantee?.content==="[[GUARANTEE_ACCEPT]]";
   const incomingGuarantee=latestGuarantee?.content.startsWith("[[GUARANTEE_REQUEST")===true&&latestGuarantee.sender_id!==userId;
   const guaranteeText=(content:string)=>content.startsWith("[[GUARANTEE_REQUEST")?(lang==="zh"?`对方已发起担保协调服务${content.includes(":")?`，金额 £${content.slice(content.indexOf(":")+1,-2)}`:""}，是否接受？`:`The other party requested guarantee coordination${content.includes(":")?` for £${content.slice(content.indexOf(":")+1,-2)}`:""}. Do you accept?`):content==="[[GUARANTEE_ACCEPT]]"?(lang==="zh"?"双方已接受担保协调服务。":"Both parties accepted guarantee coordination."):content==="[[GUARANTEE_REJECT]]"?(lang==="zh"?"对方已拒绝担保协调服务。":"The other party declined guarantee coordination."):content;
-  const isAdminMessage=(message:Message)=>adminSenders.includes(message.sender_id)||message.content.startsWith("管理员：")||message.content.startsWith("Administrator: ");
+  const unreadTotal=(inbox??[]).reduce((sum,row)=>sum+row.unread,0);
+  const selectedDmKind=selectedDm?.split(":")[0],selectedDmId=selectedDm?.split(":")[1];
+  const selectedDmRow=inbox?.find(row=>row.kind===selectedDmKind&&row.thread_id===selectedDmId)??null;
+  const selectedPrivate:PrivateThreadInfo|null=selectedDmRow&&(selectedDmRow.kind==="direct"||selectedDmRow.kind==="admin")?{kind:selectedDmRow.kind,threadId:selectedDmRow.thread_id,otherId:selectedDmRow.other_id,otherUsername:selectedDmRow.other_username,otherAvatarPath:selectedDmRow.other_avatar_path,fromAdmin:selectedDmRow.from_admin}:null;
+  const openTask=(id:string)=>{setSelectedDm(null);setSelectedConvId(id)};
+  const openPrivate=(row:InboxRow)=>{setSelectedConvId(null);setSelectedDm(`${row.kind}:${row.thread_id}`)};
+  const previewText=(content:string|null)=>!content?(lang==="zh"?"暂无消息":"No messages yet"):content.startsWith("[[GUARANTEE_")?(lang==="zh"?"担保协调消息":"Guarantee update"):content;
+  const isAdminMessage=(message:Message)=>adminSenders.includes(message.sender_id);
   return (
     <main className="min-h-screen bg-[#080a12] text-zinc-100 px-6 py-10">
       <div className="max-w-6xl mx-auto">
@@ -791,6 +855,7 @@ export default function MePage() {
             onClick={() => setTab("chat")}
           >
             {lang === "zh" ? "聊天" : "Chats"}
+            {unreadTotal > 0 && <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold leading-5 text-white">{unreadTotal > 99 ? "99+" : unreadTotal}</span>}
           </button>
           {[
             [lang === "zh" ? "正在进行" : "In progress", "ongoing"],
@@ -805,6 +870,8 @@ export default function MePage() {
             {statusMsg}
           </div>
         )}
+
+        {tab==="chat" && inboxError && <p role="alert" className="mt-4 text-sm text-rose-300">{inboxError}</p>}
 
         {/* ---------------- POSTS TAB ---------------- */}
         {tab === "posts" && <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -826,7 +893,7 @@ export default function MePage() {
                 <div className="text-lg font-semibold">{t.me.chats.listTitle}</div>
                 <button
                   className="rounded-xl border border-zinc-700 hover:border-zinc-500 px-3 py-2 text-sm"
-                  onClick={() => userId && loadConversations(userId)}
+                  onClick={() => { if (userId) { loadConversations(userId); void loadInbox(); } }}
                   disabled={!userId}
                 >
                   {t.common.refresh}
@@ -835,14 +902,41 @@ export default function MePage() {
 
               <div className="mt-3 text-xs text-zinc-500">{t.me.chats.selectTip}</div>
 
-              {convLoading ? (
+              {inbox ? (
+                inbox.length === 0 ? (
+                  <div className="mt-4 text-sm text-zinc-400">{t.me.chats.none}</div>
+                ) : (
+                  <div className="mt-4 max-h-[640px] space-y-2 overflow-y-auto pr-1">
+                    {inbox.map((row) => {
+                      const avatar = publicStorageUrl(AVATARS_BUCKET, row.other_avatar_path), name = row.other_username || (lang === "zh" ? "未设置ID" : "No ID");
+                      const active = row.kind === "task" ? (!selectedDm && selectedConvId === row.thread_id) : selectedDm === `${row.kind}:${row.thread_id}`;
+                      const label = row.kind === "task" ? (row.title || (lang === "zh" ? "任务" : "Task")) : row.from_admin ? (lang === "zh" ? "管理员私聊" : "Administrator") : row.kind === "admin" ? (lang === "zh" ? "管理员 → 用户" : "Admin → user") : (lang === "zh" ? "私聊" : "Private message");
+                      return (
+                        <button type="button" key={`${row.kind}:${row.thread_id}`} onClick={() => row.kind === "task" ? openTask(row.thread_id) : openPrivate(row)} className={`w-full rounded-xl border px-3 py-3 text-left ${active ? "border-zinc-500 bg-zinc-950/40" : "border-zinc-800 bg-zinc-950/20"}`}>
+                          <div className="flex items-center gap-3">
+                            <span className="relative shrink-0">
+                              {avatar ? <img src={avatar} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/15 text-sm text-violet-300">{name[0]?.toUpperCase()}</span>}
+                              {row.unread > 0 && <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-5 text-white">{row.unread > 99 ? "99+" : row.unread}</span>}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2"><span className={`truncate text-sm font-semibold ${row.from_admin ? "text-rose-300" : ""}`}>@{name}</span>{row.last_message_at && <span className="ml-auto shrink-0 text-[10px] text-zinc-500">{new Date(row.last_message_at).toLocaleDateString(lang === "zh" ? "zh-CN" : "en-GB")}</span>}</div>
+                              <div className={`mt-0.5 truncate text-xs ${row.kind === "task" ? "text-violet-300" : row.from_admin ? "text-rose-300/80" : "text-emerald-300/80"}`}>{label}</div>
+                              <div className={`mt-0.5 truncate text-xs ${row.unread > 0 ? "font-semibold text-zinc-100" : "text-zinc-500"}`}>{previewText(row.last_message)}</div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
+              ) : convLoading ? (
                 <div className="mt-4 text-sm text-zinc-400">{t.common.loading}</div>
               ) : convs.length === 0 ? (
                 <div className="mt-4 text-sm text-zinc-400">{t.me.chats.none}</div>
               ) : (
                 <div className="mt-4 space-y-2">
                   {convs.map((c) => {const avatar=publicStorageUrl(AVATARS_BUCKET,c.other_avatar_path),name=c.other_username||(lang==="zh"?"未设置ID":"No ID");return (
-                    <button type="button" key={c.id} onClick={() => setSelectedConvId(c.id)} className={`w-full rounded-xl border px-3 py-3 text-left ${selectedConvId === c.id ? "border-zinc-500 bg-zinc-950/40" : "border-zinc-800 bg-zinc-950/20"}`}>
+                    <button type="button" key={c.id} onClick={() => openTask(c.id)} className={`w-full rounded-xl border px-3 py-3 text-left ${selectedConvId === c.id ? "border-zinc-500 bg-zinc-950/40" : "border-zinc-800 bg-zinc-950/20"}`}>
                       <div className="flex items-center gap-3">{avatar?<img src={avatar} alt="" className="h-10 w-10 rounded-full object-cover"/>:<span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/15 text-sm text-violet-300">{name[0]?.toUpperCase()}</span>}<div className="min-w-0"><div className="truncate text-sm font-semibold">@{name}</div><div className="mt-1 truncate text-sm text-zinc-300">{c.task_title||(lang==="zh"?"任务":"Task")}</div></div></div>
                     </button>
                   )})}
@@ -851,11 +945,13 @@ export default function MePage() {
             </section>
 
             <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
-              {!selectedConvId ? (
+              {selectedDm ? (
+                selectedPrivate && userId ? <PrivateChatPanel key={selectedDm} lang={lang} uid={userId} thread={selectedPrivate} /> : <div className="text-zinc-400">{inbox ? (lang === "zh" ? "找不到这个对话。" : "Conversation not found.") : t.common.loading}</div>
+              ) : !selectedConvId ? (
                 <div className="text-zinc-400">{t.me.chats.selectTip}</div>
               ) : (
                 <>
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-950/30 p-4"><div className="grid gap-4 lg:grid-cols-[minmax(180px,.8fr)_minmax(180px,1fr)_auto] lg:items-center"><a href={otherId?`/${lang}/users/${otherId}`:"#"} className="flex min-w-0 items-center gap-3">{selectedAvatar?<img src={selectedAvatar} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover"/>:<span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-300">{selectedName[0]?.toUpperCase()}</span>}<div className="min-w-0"><div className="truncate font-bold">@{selectedName}</div><div className="mt-1 flex items-center gap-2 text-xs"><span className="text-amber-400">★ {averageRating===null?"—":averageRating.toFixed(1)}</span><span className={otherOnline?"text-emerald-400":"text-zinc-500"}>{otherOnline?(lang==="zh"?"在线":"Online"):(lang==="zh"?"离线":"Offline")}</span></div></div></a><div className="min-w-0"><div className="text-xs text-zinc-500">{lang==="zh"?"任务详情":"Task"}</div><div className="mt-1 truncate text-lg font-bold">{selectedConversation?.task_title||(lang==="zh"?"任务":"Task")}</div><div className="mt-1 text-sm font-medium text-amber-300">{lang==="zh"?"当前任务押金：":"Current deposit: "}£{Number(selectedConversation?.required_deposit??0).toFixed(2)}</div></div><div className="grid gap-2 sm:grid-cols-3 lg:w-[420px]"><div><button className="w-full rounded-lg bg-violet-500 px-3 py-2 text-xs font-bold disabled:opacity-40" onClick={confirmDeal} disabled={collaborationButtonDisabled}>{collaborationButtonLabel}</button><p className="mt-1 text-center text-[11px] text-zinc-500">{lang==="zh"?`当前状态：${workflowLabel}`:`Status: ${workflowLabel}`}</p></div><div><button type="button" disabled={!canFull||sending} onClick={()=>setGuaranteeOpen(true)} className="w-full rounded-lg border border-violet-400/40 px-3 py-2 text-xs text-violet-300 disabled:opacity-40">{lang==="zh"?"需要担保":"Request guarantee"}</button><p className={`mt-1 text-center text-[11px] ${guaranteed?"text-emerald-400":"text-zinc-500"}`}>{lang==="zh"?`当前状态：${guaranteed?"已担保":"未担保"}`:`Status: ${guaranteed?"Guaranteed":"Not guaranteed"}`}</p></div><div><button type="button" disabled className="w-full rounded-lg border border-amber-400/30 px-3 py-2 text-xs text-amber-300 disabled:opacity-80">{selectedConversation?.owner_id===userId?(lang==="zh"?"无需支付押金":"No deposit required"):(lang==="zh"?"支付押金（未开通）":"Pay deposit (unavailable)")}</button><p className="mt-1 text-center text-[11px] text-zinc-500">{selectedConversation?.owner_id===userId?(lang==="zh"?"当前状态：无需支付":"Status: Not required"):(lang==="zh"?"当前状态：未支付":"Status: Unpaid")}</p></div></div></div></div>
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-950/30 p-4"><div className="grid gap-4 lg:grid-cols-[minmax(180px,.8fr)_minmax(180px,1fr)_auto] lg:items-center"><a href={otherId?`/${lang}/users/${otherId}`:"#"} className="flex min-w-0 items-center gap-3">{selectedAvatar?<img src={selectedAvatar} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover"/>:<span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-300">{selectedName[0]?.toUpperCase()}</span>}<div className="min-w-0"><div className="truncate font-bold">@{selectedName}</div><div className="mt-1 flex items-center gap-2 text-xs"><span className="text-amber-400">★ {averageRating===null?"—":averageRating.toFixed(1)}</span><span className={otherOnline?"text-emerald-400":"text-zinc-500"}>{otherOnline?(lang==="zh"?"在线":"Online"):(lang==="zh"?"离线":"Offline")}</span></div></div></a><div className="min-w-0"><div className="text-xs text-zinc-500">{lang==="zh"?"任务详情":"Task"}</div><div className="mt-1 truncate text-lg font-bold">{selectedConversation?.task_title||(lang==="zh"?"任务":"Task")}</div><div className="mt-1 text-sm font-medium text-amber-300">{lang==="zh"?"当前任务押金：":"Current deposit: "}£{Number(selectedConversation?.required_deposit??0).toFixed(2)}</div></div><div className="grid gap-2 sm:grid-cols-3 lg:w-[420px]"><div><button className="w-full rounded-lg bg-violet-500 px-3 py-2 text-xs font-bold disabled:opacity-40" onClick={confirmDeal} disabled={collaborationButtonDisabled}>{collaborationButtonLabel}</button><p className="mt-1 text-center text-[11px] text-zinc-500">{lang==="zh"?`当前状态：${workflowLabel}`:`Status: ${workflowLabel}`}</p></div><div><button type="button" disabled={!canFull||sending} onClick={()=>setGuaranteeOpen(true)} className="w-full rounded-lg border border-violet-400/40 px-3 py-2 text-xs text-violet-300 disabled:opacity-40">{lang==="zh"?"需要担保":"Request guarantee"}</button><p className={`mt-1 text-center text-[11px] ${guaranteed?"text-emerald-400":"text-zinc-500"}`}>{lang==="zh"?`当前状态：${guaranteed?"已担保":"未担保"}`:`Status: ${guaranteed?"Guaranteed":"Not guaranteed"}`}</p></div><div><button type="button" disabled className="w-full rounded-lg border border-amber-400/30 px-3 py-2 text-xs text-amber-300 disabled:opacity-80">{depositView.label}</button><p className="mt-1 text-center text-[11px] text-zinc-500">{depositView.status}</p></div></div></div></div>
 
                   <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4 text-sm leading-7 text-zinc-300">
                     {lang==="zh"?"平台支付与资金托管功能尚未开通。如需押金或预付款保障，请点击“需要担保”联系管理员协调。经双方明确同意并核实收款信息后，可按管理员提供的方式暂存款项；待双方确认交易完成且无争议，并通知管理员后，再由管理员转付相应款项，押金按约定原路退回。请勿向未经确认的账户转账，并保留完整的沟通与付款凭证。":"The platform’s payment and safeguarded-funds features are not yet available. If you need protection for a deposit or advance payment, select “Request guarantee” to ask an administrator to coordinate. Once both parties have expressly agreed and the payment details have been verified, funds may be held using the method confirmed by the administrator. After both parties confirm that the transaction is complete and undisputed, and notify the administrator, the relevant payment will be released and any deposit returned to its original source as agreed. Do not transfer money to an unverified account, and keep complete communication and payment records."}
