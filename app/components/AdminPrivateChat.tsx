@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AVATARS_BUCKET, publicStorageUrl } from "@/lib/media";
+import { announceUnreadChanged, notifyNewMessage } from "@/lib/notify";
 type Person = { id: string; username: string | null; avatar_path: string | null };
 type Thread = { id: string; admin_id: string; user_id: string; created_at: string; person?: Person };
-type Message = { id: string; sender_id: string; content: string; created_at: string };
+type Message = { id: string; sender_id: string; content: string; created_at: string; read_at?: string | null };
 function Avatar({ person }: { person?: Person }) {
   const src = publicStorageUrl(AVATARS_BUCKET, person?.avatar_path);
   return src ? <img src={src} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-violet-200">{(person?.username || "U")[0].toUpperCase()}</span>;
@@ -17,6 +18,13 @@ export default function AdminPrivateChat({ lang, admin = false }: { lang: "zh" |
   const [query, setQuery] = useState(""), [users, setUsers] = useState<Person[]>([]);
   const [text, setText] = useState(""), [error, setError] = useState(""), [sending, setSending] = useState(false), [starting, setStarting] = useState(false);
   const bottom = useRef<HTMLDivElement>(null), sequence = useRef(0), sendLock = useRef(false);
+  const [verifiedAdmins, setVerifiedAdmins] = useState<string[]>([]);
+  useEffect(() => {
+    let active=true; setVerifiedAdmins([]);
+    if(!selected) return;
+    Promise.all([selected.admin_id,selected.user_id].map(async id => { const r=await supabase.rpc("is_market_admin_user",{p_user:id}); return !r.error&&r.data===true?id:null; })).then(ids => { if(active)setVerifiedAdmins(ids.filter((id):id is string => !!id)); });
+    return () => { active=false; };
+  },[selected?.id]);
   const lastMessage = messages.at(-1)?.id;
   const selectedId = selected?.id;
   async function loadThreads() {
@@ -56,9 +64,13 @@ export default function AdminPrivateChat({ lang, admin = false }: { lang: "zh" |
     async function poll() {
       const request = ++sequence.current;
       try {
-        const { data, error } = await supabase.from("admin_private_messages").select("id,sender_id,content,created_at").eq("thread_id", selectedId!).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit);
+        const { data, error } = await supabase.from("admin_private_messages").select("id,sender_id,content,created_at,read_at").eq("thread_id", selectedId!).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit);
         if (error) throw error;
-        if (!stopped && request === sequence.current) setMessages(((data ?? []) as Message[]).reverse());
+        if (!stopped && request === sequence.current) {
+          const rows = ((data ?? []) as Message[]).reverse();
+          setMessages(rows);
+          if (uid && document.visibilityState==="visible" && rows.some(row => row.sender_id !== uid && !row.read_at)) void supabase.rpc("mark_loaded_chat_read", { p_kind: "admin", p_thread: selectedId!, p_ids: rows.map(row => row.id) }).then(({ error }) => { if (!error) announceUnreadChanged(); });
+        }
       } catch (error: any) { if (!stopped) setError(error?.message || "Request failed"); }
       if (!stopped) timer = setTimeout(poll, 3000);
     }
@@ -94,7 +106,7 @@ export default function AdminPrivateChat({ lang, admin = false }: { lang: "zh" |
       const { data, error } = await supabase.from("admin_private_messages").insert({ thread_id: selected.id, sender_id: uid, content: text.trim() }).select("id,sender_id,content,created_at").single();
       if (error) throw error;
       ++sequence.current;
-      setMessages(previous => previous.some(message => message.id === data.id) ? previous : [...previous, data]); setText("");
+      setMessages(previous => previous.some(message => message.id === data.id) ? previous : [...previous, data]); setText(""); notifyNewMessage("admin", data.id);
     } catch (error: any) { setError(error?.message || "Request failed"); } finally { sendLock.current = false; setSending(false); }
   }
   if (!ready) return <p className="mt-6 text-zinc-400">{zh ? "加载中…" : "Loading…"}</p>;
@@ -111,11 +123,11 @@ export default function AdminPrivateChat({ lang, admin = false }: { lang: "zh" |
         <div className="max-h-80 space-y-2 overflow-y-auto">{threads.map(thread => <button type="button" key={thread.id} disabled={sending} onClick={() => select(thread)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left disabled:opacity-40 ${selectedId === thread.id ? "border-violet-400 bg-violet-500/10" : "border-white/10"}`}><Avatar person={thread.person} /><span className="min-w-0"><span className={`block truncate font-semibold ${thread.admin_id !== uid ? "text-rose-300" : ""}`}>{thread.person?.username || (zh ? "未设置ID" : "No ID")}</span><span className="text-xs text-zinc-500">{thread.admin_id !== uid ? (zh ? "管理员私聊" : "Administrator") : (zh ? "用户私聊" : "User conversation")}</span></span></button>)}{!threads.length && <p className="text-sm text-zinc-500">{zh ? "暂无私聊。管理员联系你后，对话会显示在这里。" : "No conversations yet. Messages from administrators will appear here."}</p>}</div>
       </aside>
       <section className="min-w-0 rounded-2xl border border-white/10 bg-[#11131e] p-4 sm:p-5">
-        {selected ? <><div className="flex items-center gap-3 border-b border-white/10 pb-4"><Avatar person={selected.person} /><div><h2 className="font-bold">@{selected.person?.username || (zh ? "未设置ID" : "No ID")}</h2><p className={`text-xs ${selected.admin_id !== uid ? "text-rose-300" : "text-zinc-500"}`}>{selected.admin_id !== uid ? (zh ? "管理员" : "Administrator") : (zh ? "用户" : "User")}</p></div></div>
+        {selected ? <><div className="flex items-center gap-3 border-b border-white/10 pb-4"><a href={`/${lang}/users/${selected.admin_id === uid ? selected.user_id : selected.admin_id}`} className="shrink-0"><Avatar person={selected.person} /></a><div><a href={`/${lang}/users/${selected.admin_id === uid ? selected.user_id : selected.admin_id}`} className="hover:text-violet-200"><h2 className="font-bold">@{selected.person?.username || (zh ? "未设置ID" : "No ID")}</h2></a><p className={`text-xs ${selected.admin_id !== uid ? "text-rose-300" : "text-zinc-500"}`}>{selected.admin_id !== uid ? (zh ? "管理员" : "Administrator") : (zh ? "用户" : "User")}</p></div></div>
           <div className="my-4 flex h-[380px] flex-col overflow-y-auto rounded-xl bg-black/15 p-3 sm:h-[420px]">
             {messages.length >= limit && <button type="button" onClick={() => setLimit(value => value + 100)} className="mb-3 text-xs text-violet-300">{zh ? "加载更早的消息" : "Load earlier messages"}</button>}
             <div className="flex flex-1 flex-col justify-end gap-3">{messages.map(message => {
-              const mine = message.sender_id === uid, fromAdmin = message.sender_id === selected.admin_id;
+              const mine = message.sender_id === uid, fromAdmin = verifiedAdmins.includes(message.sender_id);
               return <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-2xl px-4 py-3 sm:max-w-[75%] ${fromAdmin ? "border border-rose-400/25 bg-rose-950/40" : mine ? "bg-violet-600" : "bg-[#202130]"}`}>
                 {fromAdmin && <p className="mb-1 text-xs font-bold text-rose-300">{zh ? "管理员" : "Administrator"}</p>}
                 <p className="whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{message.content}</p><p className="mt-2 text-[10px] text-zinc-400">{new Date(message.created_at).toLocaleString(zh ? "zh-CN" : "en-GB")}</p>
