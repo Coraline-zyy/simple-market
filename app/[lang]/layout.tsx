@@ -1,11 +1,18 @@
 // app/[lang]/layout.tsx
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
+
+export async function generateMetadata({params}:{params:Promise<{lang:string}>}):Promise<Metadata> {
+ const lang=safeLang((await params).lang),name=lang==="zh"?"有求":"youqiu";
+ return {title:name,applicationName:name,manifest:`/${lang}/manifest.webmanifest`,appleWebApp:{capable:true,title:name,statusBarStyle:"black"}};
+}
 import SecurityDisclaimerModal from "@/app/components/SecurityDisclaimerModal";
 import SiteFooter from "@/app/components/SiteFooter";
 import PrimaryNav from "@/app/components/PrimaryNav";
 import { safeLang } from "@/lib/i18n";
 import { PresenceProvider } from "@/app/components/PresenceProvider";
 import AuthorNoteModal from "@/app/components/AuthorNoteModal";
+import InstallBanner, { ServiceWorkerRegister } from "@/app/components/AppInstall";
 
 export default async function LangLayout({
   children,
@@ -24,6 +31,8 @@ export default async function LangLayout({
       <SiteFooter lang={L} />
       <SecurityDisclaimerModal />
       <AuthorNoteModal lang={L} />
+      <ServiceWorkerRegister lang={L} />
+      <InstallBanner lang={L} />
     </div></PresenceProvider>
   );
 }
