@@ -7,7 +7,7 @@ import ForumLikeButton,{useForumLikes} from "@/app/components/ForumLikes";
 import OwnerBadge from "@/app/components/OwnerBadge";
 import AdminPinButton,{PinnedTag} from "@/app/components/AdminPin";
 import TaskTimeFields from "@/app/components/TaskTimeFields";
-import {ANY_TIME,formatTaskTime,localTimezone,timePayload,TimeRange} from "@/lib/taskTime";
+import {ANY_TIME,formatTaskTime,localTimezone,activityTimePayload,TimeRange} from "@/lib/taskTime";
 import CommunityImagePicker from "@/app/components/CommunityImagePicker";
 import PostImageGallery from "@/app/components/PostImageGallery";
 import {POST_IMAGES_BUCKET,uploadPostImages,AVATARS_BUCKET,publicStorageUrl} from "@/lib/media";
@@ -38,7 +38,7 @@ export default function CommunityBoard({lang,kind}:{lang:"zh"|"en";kind:Kind}){
   if(busy)return;if(!uid)return setMsg(lang==="zh"?"请先登录。":"Please sign in.");
   if(!validCommunityPost(title,body,files.length,social))return setMsg(lang==="zh"?(social?"请填写标题及活动内容。":"请填写标题，并输入内容或添加图片。"):(social?"Enter a title and activity details.":"Enter a title and add text or images."));
   setBusy(true);setMsg("");let paths:string[]=[];let saved=false;
-  try{const id=crypto.randomUUID();const schedule=social?timePayload(taskTime):{};
+  try{const id=crypto.randomUUID();const schedule=social?activityTimePayload(taskTime):{};
    if(!social)paths=await uploadPostImages(uid,"forum-post",id,files);
    const {error}=await supabase.from("community_posts").insert({id,author_id:uid,kind,category,title:title.trim(),body:body.trim(),location:social?(location.trim()||null):null,event_time:null,is_free:social,...schedule,...(!social?{image_paths:paths}:{})});
    if(error)throw error;saved=true;setFiles([]);setTitle("");setBody("");setLocation("");setTaskTime({...ANY_TIME,timezone:localTimezone()});setOpen(false);await load();

@@ -22,6 +22,11 @@ export function timePayload(range: TimeRange): TaskTime {
     task_date_from:range.dates ? range.dateFrom : null, task_date_to:range.dates ? range.dateTo : null,
     task_time_from:range.times ? range.timeFrom : null, task_time_to:range.times ? range.timeTo : null, task_timezone:timezone };
 }
+// Activities store flexible dates/hours only, not legacy task timestamps.
+export function activityTimePayload(range: TimeRange) {
+  const {task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone} = timePayload(range);
+  return {task_schedule_v2, task_date_from, task_date_to, task_time_from, task_time_to, task_timezone};
+}
 const day = (date:string) => Date.parse(date + "T00:00:00Z") / 86400000;
 const minute = (time:string) => Number(time.slice(0,2))*60 + Number(time.slice(3,5));
 function bounds(range:TimeRange) {
