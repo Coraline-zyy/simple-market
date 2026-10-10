@@ -347,9 +347,9 @@ export default function ServicesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#080a12] text-zinc-100 px-6 py-10">
+    <main className="market-hall min-h-screen bg-[#080a12] text-zinc-100 px-6 py-10">
       <div className="max-w-5xl mx-auto">
-        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+        <div className="hall-heading relative flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-3xl font-black tracking-tight">{t.servicesHall.title}</h1>
             <p className="mt-2 text-zinc-400">{lang === "zh" ? "这里有许多人愿意帮助你" : "Many people here are ready to help you."}</p>
@@ -361,8 +361,8 @@ export default function ServicesPage() {
         </div>
 
         {/* search + filter */}
-        <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_160px_120px_140px_100px]">
+        <div className="hall-filters mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+          <div className="hall-filter-grid grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_160px_120px_140px_100px]">
             <input
               className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 outline-none focus:border-indigo-500"
               placeholder={t.servicesHall.searchPlaceholder}
@@ -463,7 +463,7 @@ export default function ServicesPage() {
           </section></div>}
 
           {/* list */}
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <section className="hall-results rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
             <div className="text-lg font-semibold mb-3">
               {t.servicesHall.latest}（{filtered.length}）
             </div>
