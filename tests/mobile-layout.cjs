@@ -1,17 +1,17 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
 function mount({mobile=true,reduced=false}={}){
- const handlers={},refs=[],states=[],effects=[],scrolls=[],cleanups=[];
+ const handlers={},refs=[],states=[],effects=[],scrolls=[],cleanups=[],frames=new Map();let frameId=0;
  const window={scrollY:0,innerHeight:852,matchMedia:q=>({matches:q.includes('max-width')?mobile:q.includes('reduced-motion')?reduced:false}),scrollTo:o=>scrolls.push(o),addEventListener:(n,f)=>handlers[n]=f,removeEventListener:(n,f)=>{if(handlers[n]===f)delete handlers[n]},setInterval:()=>1,clearInterval(){},setTimeout:()=>1};
  const react={useCallback:f=>f,useRef:value=>{const ref={current:value};refs.push(ref);return ref},useState:value=>{const index=states.length;states.push(value);return[value,v=>states[index]=v]},useEffect:f=>effects.push(f)};
  const exports={};const code=ts.transpileModule(read('app/components/HomeExperience.tsx'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
- vm.runInNewContext(code,{exports,window,document:{documentElement:{scrollHeight:1500}},performance:{now:()=>0},requestAnimationFrame:()=>1,cancelAnimationFrame(){},clearInterval(){},clearTimeout(){},require:id=>id==='react'?react:id==='react/jsx-runtime'?{jsx:()=>null,jsxs:()=>null}:{default:()=>null,PlatformNotice:()=>null}});
+ vm.runInNewContext(code,{exports,window,document:{documentElement:{scrollHeight:1500}},performance:{now:()=>0},requestAnimationFrame:f=>{frames.set(++frameId,f);return frameId},cancelAnimationFrame:id=>frames.delete(id),clearInterval(){},clearTimeout(){},require:id=>id==='react'?react:id==='react/jsx-runtime'?{jsx:()=>null,jsxs:()=>null}:{default:()=>null,PlatformNotice:()=>null}});
  exports.default({lang:'zh'});refs[1].current={getBoundingClientRect:()=>({top:800})};for(const f of effects){const cleanup=f();if(cleanup)cleanups.push(cleanup)}scrolls.length=0;
  const touch=(x,y,interactive=false)=>({touches:[{clientX:x,clientY:y}],target:{closest:()=>interactive?{}:null}});
- return{handlers,states,scrolls,window,touch,unmount:()=>cleanups.forEach(f=>f())};
+ return{handlers,states,scrolls,window,touch,frame:time=>{const pending=[...frames.values()];frames.clear();pending.forEach(f=>f(time))},unmount:()=>cleanups.forEach(f=>f())};
 }
 test('upward finger swipe reveals modules and scrolls only after release',()=>{
- const h=mount();h.handlers.touchstart(h.touch(100,500));h.handlers.touchmove(h.touch(104,440));assert.equal(h.states[1],true);assert.equal(h.scrolls.length,0);h.handlers.touchend();assert.equal(h.scrolls.length,1);assert.equal(h.scrolls[0].behavior,'smooth');h.unmount();assert.equal(Object.keys(h.handlers).length,0);
+ const h=mount();h.handlers.touchstart(h.touch(100,500));h.handlers.touchmove(h.touch(104,440));assert.equal(h.states[1],true);assert.equal(h.scrolls.length,0);h.handlers.touchend();h.frame(700);assert.equal(h.scrolls.length,1);assert.equal(h.scrolls[0].behavior,'instant');assert.equal(h.scrolls[0].top,324);h.frame(1400);assert.equal(h.scrolls[1].top,648);assert.equal(h.states[0],false);h.unmount();assert.equal(Object.keys(h.handlers).length,0);
 });
 test('native scroll reveals modules without programmatic scroll',()=>{const h=mount();h.window.scrollY=30;h.handlers.scroll();assert.equal(h.states[1],true);assert.equal(h.scrolls.length,0)});
 test('horizontal, downward, cancelled and interactive gestures do not explore',()=>{
@@ -21,4 +21,4 @@ test('desktop gestures do not reveal; reduced motion avoids smooth scroll',()=>{
  const desktop=mount({mobile:false});desktop.handlers.touchstart(desktop.touch(100,500));desktop.handlers.touchmove(desktop.touch(100,430));desktop.handlers.touchend();assert.equal(desktop.states[1],false);
  const h=mount({reduced:true});h.handlers.touchstart(h.touch(100,500));h.handlers.touchmove(h.touch(100,430));h.handlers.touchend();assert.equal(h.scrolls[0].behavior,'instant');
 });
-test('mobile layouts use compact grids and lightweight animations',()=>{const css=read('app/globals.css');assert.match(css,/\.hall-filter-grid \{ grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);assert.match(css,/\.workspace-tabs \{ display:grid; grid-template-columns:repeat\(3/);assert.match(css,/\.home-glow \{ display:none/);assert.match(css,/transition:opacity 200ms ease,transform 200ms ease/);assert.doesNotMatch(read('app/components/HomeExperience.tsx'),/transition-all|duration-\[1200ms\]/)});
+test('original reveal timing remains on mobile with compositor-only animation',()=>{const css=read('app/globals.css'),home=read('app/components/HomeExperience.tsx');assert.match(css,/\.hall-filter-grid \{ grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);assert.match(css,/\.workspace-tabs \{ display:grid; grid-template-columns:repeat\(3/);assert.match(css,/translate3d\(0,112px,0\)/);assert.match(css,/opacity 1200ms ease-out,transform 1200ms ease-out/);assert.match(css,/opacity 950ms ease var\(--module-delay\)/);assert.match(home,/duration=1400/);assert.match(home,/i\*170/);assert.doesNotMatch(css,/transition:opacity 200ms|\.home-module \{ opacity:1; transform:none/);assert.match(css,/radial-gradient/);assert.match(home,/setAnimating\(false\),1800/);assert.doesNotMatch(home,/transition-all/)});
