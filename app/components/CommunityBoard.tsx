@@ -21,7 +21,7 @@ export default function CommunityBoard({lang,kind}:{lang:"zh"|"en";kind:Kind}){
  const [files,setFiles]=useState<File[]>([]);
  const participationLock=useRef(false);
  const [title,setTitle]=useState(""),[body,setBody]=useState(""),[category,setCategory]=useState(social?"activity":"service"),[location,setLocation]=useState(""),[taskTime,setTaskTime]=useState<TimeRange>({...ANY_TIME,timezone:localTimezone()});
- const copy=useMemo(()=>social?{title:lang==="zh"?"社交广场":"Social",sub:lang==="zh"?"免费活动、兴趣搭子和轻松组队":"Free activities, interests and people",button:lang==="zh"?"发布活动":"Create activity"}:{title:lang==="zh"?"讨论论坛":"Discussions",sub:lang==="zh"?"交流服务体验、观点和网站建议":"Share service experiences, ideas and feedback",button:lang==="zh"?"发布帖子":"Create post"},[lang,social]);
+ const copy=useMemo(()=>social?{title:lang==="zh"?"社交广场":"Social",sub:lang==="zh"?"举办活动、兴趣搭子和轻松组队":"Host activities, find shared interests and team up",button:lang==="zh"?"发布活动":"Create activity"}:{title:lang==="zh"?"讨论论坛":"Discussions",sub:lang==="zh"?"交流服务体验、观点和网站建议":"Share service experiences, ideas and feedback",button:lang==="zh"?"发布帖子":"Create post"},[lang,social]);
  const likes=useForumLikes(social?[]:rows.map(row=>row.id),uid,setMsg);
  async function load(){
   const columns=`id,author_id,kind,category,title,body,location,event_time,created_at,score,comment_count,pinned_at${!social?",image_paths":""}${social?","+scheduleColumns:""}`;
