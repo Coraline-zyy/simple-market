@@ -14,14 +14,14 @@ export default function HomeExperience({lang}:{lang:"zh"|"en"}){
  const fullTitle=lang==="zh"?"今天有什么可以帮到您？":"What can we help you with today?";
  const [scrolling,setScrolling]=useState(false),[expanded,setExpanded]=useState(false),[displayedTitle,setDisplayedTitle]=useState(""),[showSubtitle,setShowSubtitle]=useState(false),[animating,setAnimating]=useState(false);
  const cancelScroll=useRef<(()=>void)|null>(null),modulesRef=useRef<HTMLElement>(null),expandedRef=useRef(false);
+ const [userMotion,setUserMotion]=useState(false),userMotionRef=useRef(false);
  const reveal=useCallback(()=>{if(expandedRef.current)return;expandedRef.current=true;setAnimating(true);setExpanded(true)},[]);
  useEffect(()=>{if(!animating)return;const timer=window.setTimeout(()=>setAnimating(false),1800);return()=>clearTimeout(timer)},[animating]);
  const explore=useCallback(()=>{
-  reveal();cancelScroll.current?.();
+  // Explicit exploration keeps the original animation; passive loading still respects reduced motion.
+  userMotionRef.current=true;setUserMotion(true);reveal();cancelScroll.current?.();
   const top=modulesRef.current?modulesRef.current.getBoundingClientRect().top+window.scrollY-64:window.scrollY;
-  const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if(reduced){setScrolling(false);window.scrollTo({top,behavior:"instant"})}
-  else{setScrolling(true);cancelScroll.current=scrollOverTime(top,()=>setScrolling(false))}
+  setScrolling(true);cancelScroll.current=scrollOverTime(top,()=>setScrolling(false));
  },[reveal]);
  useEffect(()=>{
   cancelScroll.current?.();setScrolling(false);expandedRef.current=false;setExpanded(false);window.scrollTo({top:0,behavior:"instant"});
@@ -42,8 +42,8 @@ export default function HomeExperience({lang}:{lang:"zh"|"en"}){
   return()=>{window.removeEventListener("touchstart",onStart);window.removeEventListener("touchmove",onMove);window.removeEventListener("touchend",onEnd);window.removeEventListener("touchcancel",onCancel);window.removeEventListener("scroll",onScroll);cancelScroll.current?.()};
  },[explore,reveal,lang]);
  const items=[["需求","Requests","发布您的需求","Post your request","demands"],["服务","Services","为他人提供服务","Offer services to others","services"],["社交","Social","免费活动与搭子","Free activities & people","social"],["讨论","Discuss","分享观点建议","Share ideas","forum"],["我的","Me","聊天与合作进度","Chats & progress","me"]];
- function toggle(){if(scrolling)return;if(!expandedRef.current){explore();return}cancelScroll.current?.();const done=()=>{expandedRef.current=false;setExpanded(false);setScrolling(false)};if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){window.scrollTo({top:0,behavior:"instant"});done()}else{setScrolling(true);cancelScroll.current=scrollOverTime(0,done)}}
- return <main className="home-experience bg-[#080a12] text-center">
+ function toggle(){if(scrolling)return;if(!expandedRef.current){explore();return}cancelScroll.current?.();const done=()=>{expandedRef.current=false;setExpanded(false);setScrolling(false)};if(!userMotionRef.current&&window.matchMedia("(prefers-reduced-motion: reduce)").matches){window.scrollTo({top:0,behavior:"instant"});done()}else{setScrolling(true);cancelScroll.current=scrollOverTime(0,done)}}
+ return <main className={`home-experience bg-[#080a12] text-center ${userMotion?"home-user-motion":""}`}>
   <section className="home-hero relative flex min-h-[calc(100svh-4rem)] items-start justify-center overflow-hidden px-5 pt-[18vh]">
    <div className="home-glow pointer-events-none absolute left-1/2 top-20 h-80 w-80 -translate-x-1/2 rounded-full bg-violet-600/10 blur-3xl"/>
    <div className="relative max-w-5xl"><h1 className="min-h-[1.2em] text-4xl font-black tracking-tight text-white sm:text-6xl">{displayedTitle}<span className={displayedTitle.length<fullTitle.length?"ml-1 inline-block h-[.9em] w-[2px] animate-pulse bg-violet-400":"hidden"}/></h1><p className={`home-subtitle mx-auto mt-7 text-base text-zinc-400 transition duration-700 sm:text-lg ${showSubtitle?"translate-y-0 opacity-100":"translate-y-3 opacity-0"}`}>{lang==="zh"?"请把您的需求发出来。您也可以为他人提供服务。":"Share what you need. You can also offer your services to others."}</p><div className={`home-notice transition duration-700 ${showSubtitle?"opacity-100":"opacity-0"}`}><PlatformNotice lang={lang}/></div></div>

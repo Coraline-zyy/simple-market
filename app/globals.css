@@ -75,3 +75,7 @@ html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion:reduce) {
   .home-modules,.home-module,.home-subtitle,.home-notice,.home-explore > span:last-child { transition:none; will-change:auto; }
 }
+/* Restore the requested reveal only after deliberate exploration, not on page load. */
+.home-user-motion .home-modules { transition:opacity 1200ms ease-out,transform 1200ms ease-out; }
+.home-user-motion .home-module { transition:opacity 950ms ease var(--module-delay),transform 950ms ease var(--module-delay); }
+.home-user-motion .home-explore > span:last-child { transition:transform 700ms; }
