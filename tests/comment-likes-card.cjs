@@ -49,6 +49,7 @@ test('card background navigation excludes links, buttons, lightboxes and selecte
   const board = read('app/components/CommunityBoard.tsx');
   assert.match(board, /onClick=\{event=>\{if\(shouldOpenCommunityCard/);
   assert.ok(board.includes('"详情 →":"Details →"'));
+  assert.match(read('app/components/PostImageGallery.tsx'), /<div data-card-interactive className="fixed inset-0/);
   const detail = read('app/[lang]/community/[id]/page.tsx');
   assert.match(detail, /useCommentLikes\(comments.map/); assert.match(detail, /commentLikes.toggle\(c.id,lang\)/);
 });
