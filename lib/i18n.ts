@@ -11,6 +11,22 @@ export function safeLang(x: any): Lang {
  */
 export const ALL_VALUE = "__all__";
 
+// Stored category values stay stable across languages; translate labels only.
+const EN_CATEGORY_LABELS: Record<string, string> = {
+  家政: "Home services",
+  维修: "Repairs",
+  搬家: "Moving",
+  跑腿: "Errands",
+  教育: "Education",
+  设计: "Design",
+  其他: "Other",
+};
+
+export function categoryLabel(value: string | null | undefined, lang: Lang): string {
+  const category = value || "其他";
+  return lang === "en" ? EN_CATEGORY_LABELS[category] || category : category;
+}
+
 const zh = {
   common: {
     services: "服务大厅",

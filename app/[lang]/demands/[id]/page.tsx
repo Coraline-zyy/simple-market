@@ -8,7 +8,7 @@ import ReportButton from "@/app/components/ReportButton";
 import OwnerBadge from "@/app/components/OwnerBadge";
 import AdminPinButton, { PinnedTag } from "@/app/components/AdminPin";
 import { supabase } from "@/lib/supabaseClient";
-import { getT, safeLang } from "@/lib/i18n";
+import { categoryLabel, getT, safeLang } from "@/lib/i18n";
 
 type Demand = TaskTime & {
   id: string;
@@ -215,7 +215,7 @@ export default function DemandDetailPage() {
                 <div className="text-2xl font-bold">{item.title}</div>
                 <div className="flex gap-2 items-center">
                   <div className="text-xs rounded-full border border-zinc-700 px-2 py-1 text-zinc-200">
-                    {item.category || t.categories.other}
+                    {categoryLabel(item.category, lang)}
                   </div>
                   {item.status === "completed" && (
                     <div className="text-xs rounded-full border border-emerald-700 px-2 py-1 text-emerald-200">

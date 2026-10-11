@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import PostImageGallery from "@/app/components/PostImageGallery";
 import { MAX_POST_IMAGES, uploadPostImages } from "@/lib/media";
 import { supabase } from "@/lib/supabaseClient";
-import { ALL_VALUE, getT, safeLang } from "@/lib/i18n";
+import { ALL_VALUE, categoryLabel, getT, safeLang } from "@/lib/i18n";
 import { useParams } from "next/navigation";
 import OwnerBadge from "@/app/components/OwnerBadge";
 import AdminPinButton, { PinnedTag, pinnedFirst } from "@/app/components/AdminPin";
@@ -63,7 +63,7 @@ export default function DemandsPage() {
   // publish form
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<string>(t.categories.other);
+  const [category, setCategory] = useState<string>("其他");
   const [budget, setBudget] = useState("");
   const [requiredDeposit,setRequiredDeposit]=useState("0");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -88,7 +88,7 @@ export default function DemandsPage() {
 
   // 语言切换时，保证默认 category 合法
   useEffect(() => {
-    if (!CATEGORIES.includes(category as any)) setCategory(t.categories.other);
+    if (!CATEGORIES.includes(category as any)) setCategory("其他");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
@@ -273,7 +273,7 @@ export default function DemandsPage() {
         ...taskTiming,
         title: title.trim(),
         description: description.trim() ? description.trim() : null,
-        category: category || t.categories.other,
+        category: category || "其他",
         budget: budgetNumber,
         required_deposit: depositNumber,
         status: "active",
@@ -304,7 +304,7 @@ export default function DemandsPage() {
 
     setTitle("");
     setDescription("");
-    setCategory(t.categories.other);
+    setCategory("其他");
     setBudget("");
     setRequiredDeposit("0");
     setStatusMsg(lang === "zh" ? "发布成功 ✅" : "Posted ✅");
@@ -374,7 +374,7 @@ export default function DemandsPage() {
               <option value={ALL_VALUE}>{t.categories.allLabel}</option>
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {categoryLabel(c, lang)}
                 </option>
               ))}
             </select>
@@ -413,7 +413,7 @@ export default function DemandsPage() {
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {categoryLabel(c, lang)}
                   </option>
                 ))}
               </select>
@@ -475,7 +475,7 @@ export default function DemandsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="font-semibold">{it.title}</div>
                       <div className="text-xs rounded-full border border-zinc-700 px-2 py-1 text-zinc-200">
-                        {it.category || t.categories.other}
+                        {categoryLabel(it.category, lang)}
                       </div>
                     </div>
 
