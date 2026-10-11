@@ -11,6 +11,7 @@ import SiteFooter from "@/app/components/SiteFooter";
 import PrimaryNav from "@/app/components/PrimaryNav";
 import { safeLang } from "@/lib/i18n";
 import { PresenceProvider } from "@/app/components/PresenceProvider";
+import TradeNoticeModal from "@/app/components/TradeNoticeModal";
 import AuthorNoteModal from "@/app/components/AuthorNoteModal";
 import InstallBanner, { ServiceWorkerRegister } from "@/app/components/AppInstall";
 
@@ -31,6 +32,7 @@ export default async function LangLayout({
       <SiteFooter lang={L} />
       <SecurityDisclaimerModal />
       <AuthorNoteModal lang={L} />
+      <TradeNoticeModal lang={L} />
       <ServiceWorkerRegister lang={L} />
       <InstallBanner lang={L} />
     </div></PresenceProvider>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { safeLang, getT } from "@/lib/i18n";
+import {OPEN_TRADE_NOTICE} from "@/app/components/TradeNoticeModal";
 import {OPEN_AUTHOR_NOTE_EVENT} from "@/app/components/AuthorNoteModal";
 
 export default function SiteFooter({ lang }: { lang: string }) {
@@ -19,6 +20,7 @@ export default function SiteFooter({ lang }: { lang: string }) {
           <Link href={`/${L}/account`} className="font-medium text-zinc-300 underline decoration-zinc-600 underline-offset-4 transition hover:text-white">{t.common.account}</Link>
           <button type="button" onClick={()=>window.dispatchEvent(new Event(OPEN_AUTHOR_NOTE_EVENT))} className="font-medium text-zinc-300 underline decoration-zinc-600 underline-offset-4 transition hover:text-white">{L==="zh"?"作者的话":"Creator's note"}</button>
           <Link href={`/${L}/disclaimer`} className="font-medium text-zinc-300 underline decoration-zinc-600 underline-offset-4 transition hover:text-white">{t.common.disclaimerLink}</Link>
+          <button type="button" onClick={()=>window.dispatchEvent(new Event(OPEN_TRADE_NOTICE))} className="font-medium text-zinc-300 underline decoration-zinc-600 underline-offset-4 hover:text-white">{L==="zh"?"交易注意事项":"Transaction guidance"}</button>
         </div>
       </div>
     </footer>

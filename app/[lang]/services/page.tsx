@@ -357,7 +357,7 @@ export default function ServicesPage() {
           <button type="button" onClick={() => setShowPublish(true)} className="rounded-xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400">
             {lang === "zh" ? "发布您的服务" : "Post your service"}
           </button>
-          <p className="w-full text-center text-xs font-medium text-white lg:absolute lg:left-1/2 lg:top-1/2 lg:w-auto lg:max-w-sm lg:-translate-x-1/2 lg:-translate-y-1/2">{lang==="zh"?"如需交易担保或押金支付协助，请在聊天中点击“需要担保”，由管理员介入协调。":"For transaction guarantees or help arranging a deposit payment, select “Request guarantee” in chat for administrator assistance."}</p>
+          <p className="w-full text-center text-xs font-medium text-white lg:absolute lg:left-1/2 lg:top-1/2 lg:w-auto lg:max-w-sm lg:-translate-x-1/2 lg:-translate-y-1/2">{lang==="zh"?"如需交易担保或押金支付协助，请在聊天中点击“需要担保”，由管理员介入协调。":"For transaction guarantees or help arranging a deposit payment, select “Request guarantee” in chat for administrator assistance."}<span className="mt-2 block text-sm font-semibold sm:text-base">{lang==="zh"?"我们鼓励用户线下银行转账或现金交易。":"We encourage users to transact offline by bank transfer or cash."}</span></p>
         </div>
 
         {/* search + filter */}
