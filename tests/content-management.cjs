@@ -9,7 +9,7 @@ test('other posts follows arbitration and uses the dedicated author-scoped manag
 });
 test('deletion is explicitly confirmed and enforced by actual author in the database',()=>{
  const ui=read('app/components/ContentActions.tsx'),sql=read('supabase/2026_10_12_content_management.sql');
- assert.match(ui,/if\(busy\|\|!mine\)return/);assert.match(ui,/window.confirm\(warning\)/);assert.match(ui,/delete_my_content/);
+ assert.match(ui,/if\(busy\|\|!mine\|\|!confirmOpen\)return/);assert.match(ui,/setConfirmOpen\(true\)/);assert.match(ui,/role="alertdialog"/);assert.match(ui,/delete_my_content/);
  assert.match(sql,/me uuid:=auth.uid\(\)/);assert.match(sql,/author_id=me and not moderation_deleted/);assert.match(sql,/reviewer_id=me/);assert.match(sql,/removed<>1/);assert.match(sql,/grant execute.*to authenticated/);
  assert.doesNotMatch(sql,/delete from public\.[a-z_]+;/);
 });
