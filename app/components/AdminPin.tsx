@@ -2,6 +2,7 @@
 // Administrator-only "Pin to top" control + the "Pinned" label shown on posts.
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import AdminDeleteButton from "./AdminDeleteButton";
 
 export function useIsAdmin() {
   const [admin, setAdmin] = useState(false);
@@ -48,6 +49,7 @@ export default function AdminPinButton({ kind, id, pinnedAt, lang, onChanged }: 
       {busy ? "…" : pinned ? (lang === "zh" ? "取消置顶" : "Unpin") : (lang === "zh" ? "管理员置顶" : "Pin to top")}
     </button>
     {error && <span className="mt-1 text-[11px] text-rose-300">{error}</span>}
+    <span className="mt-2"><AdminDeleteButton admin={admin} kind={kind} id={id} lang={lang}/></span>
   </span>;
 }
 
