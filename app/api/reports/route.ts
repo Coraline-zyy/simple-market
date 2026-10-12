@@ -74,12 +74,18 @@ export async function POST(req: NextRequest) {
         "",
         description,
       ].join("\n");
+      // Notification failure must not turn an already-saved report into a failed submission.
+      try {
       const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from, to: [to], subject, text }),
+        signal: AbortSignal.timeout(5000),
       });
       emailSent = emailRes.ok;
+      } catch {
+        emailSent = false;
+      }
     }
 
     return NextResponse.json({ ok: true, id: report.id, emailSent });

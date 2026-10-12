@@ -68,6 +68,8 @@ export default function ServicesPage() {
   const [requiredDeposit,setRequiredDeposit]=useState("0");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [showPublish, setShowPublish] = useState(false);
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // auth
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -239,6 +241,10 @@ export default function ServicesPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
     setStatus("");
 
     const { data } = await supabase.auth.getUser();
@@ -285,6 +291,7 @@ export default function ServicesPage() {
       return;
     }
 
+    let imageFailure = "";
     if (imageFiles.length) {
       try {
         const paths = await uploadPostImages(user.id, "service", inserted.id, imageFiles);
@@ -292,7 +299,7 @@ export default function ServicesPage() {
         if (imageUpdateError) throw imageUpdateError;
         (inserted as any).image_paths = paths;
       } catch (e) {
-        setStatus((lang === "zh" ? "发布成功，但图片上传失败：" : "Published, but image upload failed: ") + (e instanceof Error ? e.message : "Unknown"));
+        imageFailure = (lang === "zh" ? "发布成功，但图片上传失败：" : "Published, but image upload failed: ") + (e instanceof Error ? e.message : "Unknown");
       }
     }
 
@@ -307,9 +314,15 @@ export default function ServicesPage() {
     setPrice("");
     setRequiredDeposit("0");
     setImageFiles([]);
-    setStatus(t.servicesHall.publishOk);
+    setStatus(imageFailure || t.servicesHall.publishOk);
     setTaskTime(ANY_TIME);
     setShowPublish(false);
+    } catch (error) {
+      setStatus(t.servicesHall.publishFail + (error instanceof Error ? error.message : "Unknown"));
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   }
 
   async function loadContact(serviceId: string) {
@@ -449,10 +462,11 @@ export default function ServicesPage() {
 
                 <button
                   type="submit"
-                  disabled={!canUseEmail}
+                  disabled={!canUseEmail || submitting}
+                  aria-busy={submitting}
                   className="rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-950 font-semibold px-6 py-3"
                 >
-                  {t.servicesHall.publishBtn}
+                  {submitting ? (lang === "zh" ? "发布中…" : "Publishing…") : t.servicesHall.publishBtn}
                 </button>
               </div>
 
