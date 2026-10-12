@@ -11,6 +11,9 @@ type Props = {
   dealId?: string | null;
   postType?: "service" | "demand" | null;
   postId?: string | null;
+  contentType?: "community_post" | "comment" | "review";
+  contentId?: string;
+  label?: string;
 };
 
 export default function ReportButton(props: Props) {
@@ -24,6 +27,7 @@ export default function ReportButton(props: Props) {
   const [message, setMessage] = useState("");
 
   async function submit() {
+    if (busy) return;
     setMessage("");
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -55,10 +59,10 @@ export default function ReportButton(props: Props) {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className="text-sm text-red-300 underline underline-offset-4 hover:text-red-200">
-        {t.report.button}
+        {props.label || t.report.button}
       </button>
       {open && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
+        <div data-card-interactive role="dialog" aria-modal="true" aria-label={t.report.title} className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
           <div className="w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-950 p-6">
             <div className="flex items-start justify-between gap-4">
               <div>

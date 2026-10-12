@@ -21,15 +21,35 @@ export async function POST(req: NextRequest) {
     const reason = String(body.reason ?? "other").slice(0, 80);
     if (description.length < 10 || description.length > 4000) return NextResponse.json({ error: "Description must be 10-4000 characters." }, { status: 400 });
 
+    let contentContext: {content_type:string;content_id:string;content_snapshot:unknown} | null = null;
+    let reportedUserId = body.reportedUserId || null;
+    if (body.contentType || body.contentId) {
+      const targets = {
+        community_post: {table:"community_posts",author:"author_id",columns:"id,author_id,kind,title,body,image_paths"},
+        comment: {table:"community_comments",author:"author_id",columns:"id,author_id,post_id,body,image_paths"},
+        review: {table:"reviews",author:"reviewer_id",columns:"id,reviewer_id,reviewee_id,deal_id,rating,text"},
+      } as const;
+      const kind=body.contentType as keyof typeof targets;
+      if (!Object.hasOwn(targets,kind) || typeof body.contentId!=="string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.contentId)) return NextResponse.json({error:"Invalid report target"},{status:400});
+      const target=targets[kind];
+      const {data:content,error}=await supabase.from(target.table).select(target.columns).eq("id",body.contentId).maybeSingle();
+      if(error || !content) return NextResponse.json({error:"Content unavailable"},{status:404});
+      const snapshot=content as unknown as Record<string,unknown>;
+      reportedUserId=snapshot[target.author];
+      if(reportedUserId===authData.user.id)return NextResponse.json({error:"You cannot report your own content"},{status:400});
+      contentContext={content_type:kind,content_id:body.contentId,content_snapshot:snapshot};
+    }
+
     const row = {
       reporter_id: authData.user.id,
-      reported_user_id: body.reportedUserId || null,
+      reported_user_id: reportedUserId,
       conversation_id: body.conversationId || null,
       deal_id: body.dealId || null,
       post_type: body.postType || null,
       post_id: body.postId || null,
       reason,
-      description,
+      description: contentContext ? `[${contentContext.content_type}: ${contentContext.content_id}]\n${description}` : description,
+      ...(contentContext || {}),
     };
 
     const { data: report, error: insertError } = await supabase.from("reports").insert(row).select("id, created_at").single();
@@ -49,6 +69,7 @@ export async function POST(req: NextRequest) {
         `Conversation: ${row.conversation_id ?? "-"}`,
         `Deal: ${row.deal_id ?? "-"}`,
         `Post: ${row.post_type ?? "-"} ${row.post_id ?? "-"}`,
+        `Content: ${contentContext?.content_type ?? "-"} ${contentContext?.content_id ?? "-"}`,
         `Reason: ${reason}`,
         "",
         description,

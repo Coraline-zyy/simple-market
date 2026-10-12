@@ -4,6 +4,7 @@ import {guaranteeCopy} from "@/lib/guaranteeCopy";
 import {depositPresentation} from "@/lib/depositRole";
 import TaskTimeFields from "@/app/components/TaskTimeFields";
 import { TaskTime, TimeRange, ANY_TIME, timePayload, formatTaskTime, rangeFromTask } from "@/lib/taskTime";
+import MyCommunityPosts from "@/app/components/MyCommunityPosts";
 import WorkflowPanel from "@/app/components/WorkflowPanel";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -147,7 +148,7 @@ export default function MePage() {
   const needEmail = !userEmail;
 
   // UI
-  const [tab, setTab] = useState<"posts" | "chat" | "ongoing" | "settling" | "completed" | "arbitration">(initialTab);
+  const [tab, setTab] = useState<"posts" | "chat" | "ongoing" | "settling" | "completed" | "arbitration" | "other">(initialTab);
   const [statusMsg, setStatusMsg] = useState("");
 
   // profile bio
@@ -865,7 +866,8 @@ export default function MePage() {
             [lang === "zh" ? "结算中" : "Settling", "settling"],
             [lang === "zh" ? "已完成" : "Completed", "completed"],
             [lang === "zh" ? "仲裁中" : "Arbitration", "arbitration"],
-          ].map(([label, status]) => <button key={status} onClick={() => setTab(status as "ongoing" | "settling" | "completed" | "arbitration")} className={`rounded-xl border px-4 py-2 text-sm hover:border-zinc-600 hover:text-white ${tab===status?"border-violet-400 bg-violet-500/15 text-violet-200":"border-zinc-800 text-zinc-300"}`}>{label}</button>)}
+            [lang === "zh" ? "其他发布" : "Other posts", "other"],
+          ].map(([label, status]) => <button key={status} onClick={() => setTab(status as "ongoing" | "settling" | "completed" | "arbitration" | "other")} className={`rounded-xl border px-4 py-2 text-sm hover:border-zinc-600 hover:text-white ${tab===status?"border-violet-400 bg-violet-500/15 text-violet-200":"border-zinc-800 text-zinc-300"}`}>{label}</button>)}
         </div>
 
         {statusMsg && (
@@ -886,6 +888,7 @@ export default function MePage() {
             </section>
           })}
         </div>}
+        {tab==="other"&&<MyCommunityPosts userId={userId} lang={lang}/>}
         {["ongoing","settling","completed","arbitration"].includes(tab)&&<WorkflowPanel userId={userId} lang={lang} mode={tab}/>}
 
         {/* ---------------- CHAT TAB ---------------- */}

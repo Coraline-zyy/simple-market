@@ -31,7 +31,7 @@ const zh = {
   common: {
     services: "服务大厅",
     demands: "需求大厅",
-    me: "我的发布 / 对话",
+    me: "我的发布",
     backHome: "返回首页",
     refresh: "刷新",
     manualRefresh: "刷新",
@@ -177,7 +177,7 @@ const zh = {
   },
 
   transaction: {
-    title: "交易记录 / 聊天", listTitle: "我的交易", listSubtitle: "进行中和已完成交易都会保留，可点击进入查看历史记录并继续聊天。", noneActive: "暂无进行中的交易。", noneCompleted: "暂无已完成的交易。", back: "返回我的发布 / 对话", loginRequired: "请先登录后查看交易记录。", notFound: "找不到该交易，或你不是该交易参与者。",
+    title: "交易记录 / 聊天", listTitle: "我的交易", listSubtitle: "进行中和已完成交易都会保留，可点击进入查看历史记录并继续聊天。", noneActive: "暂无进行中的交易。", noneCompleted: "暂无已完成的交易。", back: "返回我的发布", loginRequired: "请先登录后查看交易记录。", notFound: "找不到该交易，或你不是该交易参与者。",
     activeNotice: "交易进行中：你可以查看历史记录并继续聊天。", completedNotice: "该交易已完成：历史记录保留，仍可继续沟通。", completedChatHint: "此交易已完成，以下消息属于完成后的继续沟通记录。",
     historyChat: "历史聊天", noMessages: "暂无消息。", messagePlaceholder: "输入消息…", sendFailed: "发送失败：", confirm: "确认成交 / 完成", otherUser: "对方用户",
   },
@@ -254,7 +254,7 @@ const zh = {
   },
 
   me: {
-    title: "我的发布 / 对话",
+    title: "我的发布",
     subtitle: "",
     loggedEmail: "已登录",
     loggedAnon: "匿名登录",
@@ -353,7 +353,7 @@ const en = {
   common: {
     services: "Services",
     demands: "Demands",
-    me: "My Posts / Chats",
+    me: "My Posts",
     backHome: "Back Home",
     refresh: "Refresh",
     manualRefresh: "Refresh",
@@ -478,7 +478,7 @@ const en = {
   },
 
   transaction: {
-    title: "Transaction History / Chat", listTitle: "My Transactions", listSubtitle: "Both active and completed transactions are retained. Open any transaction to review the history and continue chatting.", noneActive: "No active transactions.", noneCompleted: "No completed transactions.", back: "Back to My Posts / Chats", loginRequired: "Please sign in to view transaction history.", notFound: "This transaction could not be found, or you are not a participant.", activeNotice: "Transaction in progress: review the history and continue chatting here.", completedNotice: "This transaction is completed. The history is retained and you can still communicate.", completedChatHint: "This transaction is completed. Messages below are post-completion communication.", historyChat: "Chat history", noMessages: "No messages yet.", messagePlaceholder: "Type a message…", sendFailed: "Send failed: ", confirm: "Confirm deal / completion", otherUser: "Other user",
+    title: "Transaction History / Chat", listTitle: "My Transactions", listSubtitle: "Both active and completed transactions are retained. Open any transaction to review the history and continue chatting.", noneActive: "No active transactions.", noneCompleted: "No completed transactions.", back: "Back to My Posts", loginRequired: "Please sign in to view transaction history.", notFound: "This transaction could not be found, or you are not a participant.", activeNotice: "Transaction in progress: review the history and continue chatting here.", completedNotice: "This transaction is completed. The history is retained and you can still communicate.", completedChatHint: "This transaction is completed. Messages below are post-completion communication.", historyChat: "Chat history", noMessages: "No messages yet.", messagePlaceholder: "Type a message…", sendFailed: "Send failed: ", confirm: "Confirm deal / completion", otherUser: "Other user",
   },
 
   userProfile: { unnamed: "Unnamed user", noBio: "This user has no bio yet.", reviews: "Reviews", noReviews: "No reviews yet." },
@@ -554,7 +554,7 @@ const en = {
   },
 
   me: {
-    title: "My Posts / Chats",
+    title: "My Posts",
     subtitle: "",
     loggedEmail: "Logged in",
     loggedAnon: "Anonymous",

@@ -1,5 +1,6 @@
 "use client";
 
+import ContentActions from "./ContentActions";
 import { useEffect, useMemo, useState } from "react";
 import { AVATARS_BUCKET, publicStorageUrl } from "@/lib/media";
 import { supabase } from "@/lib/supabaseClient";
@@ -43,6 +44,7 @@ export default function ProfileReviews({ userId, lang }: { userId: string; lang:
       <div className="mt-5 space-y-3">{reviews.map((review) => { const reviewer = reviewers[review.reviewer_id]; const avatarUrl = publicStorageUrl(AVATARS_BUCKET, reviewer?.avatar_path); const name = reviewer?.username || reviewer?.display_name || (lang === "zh" ? "用户" : "User"); return <article key={review.id} className="rounded-xl border border-zinc-800 p-4">
         <div className="flex items-center gap-3"><a href={`/${lang}/users/${review.reviewer_id}`} className="flex min-w-0 items-center gap-3 hover:text-violet-200">{avatarUrl ? <img src={avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-sm">{name.slice(0, 1).toUpperCase()}</div>}<div className="min-w-0"><div className="truncate text-sm font-medium">{name}</div></div></a><time className="ml-auto text-xs text-zinc-500" dateTime={review.created_at}>{dateFormatter.format(new Date(review.created_at))}</time></div>
         <div className="mt-3 text-amber-400" aria-label={`${review.rating} / 5`}>{"★".repeat(review.rating)}<span className="text-zinc-700">{"★".repeat(5 - review.rating)}</span></div>{review.text && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-300">{review.text}</p>}
+        <ContentActions kind="review" id={review.id} authorId={review.reviewer_id} lang={lang} onDeleted={()=>setReviews(current=>current.filter(row=>row.id!==review.id))}/>
       </article>; })}</div>
     </>}
   </section>;
