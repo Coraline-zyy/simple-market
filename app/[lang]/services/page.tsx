@@ -4,6 +4,7 @@ import {DepositDraft} from "@/app/components/PaymentPreview";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import PostImageGallery from "@/app/components/PostImageGallery";
+import MobileHallFilters from "@/app/components/MobileHallFilters";
 import { MAX_POST_IMAGES, uploadPostImages } from "@/lib/media";
 import { supabase } from "@/lib/supabaseClient";
 import { ALL_VALUE, categoryLabel, getT, safeLang } from "@/lib/i18n";
@@ -382,7 +383,7 @@ export default function ServicesPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-
+            <MobileHallFilters lang={lang} active={filterCategory!==ALL_VALUE || timeRange!==ANY_TIME}>
             <select
               className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 outline-none focus:border-indigo-500"
               value={filterCategory}
@@ -407,6 +408,7 @@ export default function ServicesPage() {
             >
               {t.common.manualRefresh}
             </button>
+            </MobileHallFilters>
           </div>
         </div>
 
@@ -487,23 +489,23 @@ export default function ServicesPage() {
             ) : (
               <div className="space-y-3">
                 {filtered.map((it) => (
-                  <div key={it.id} className={`rounded-xl border p-4 ${it.pinned_at ? "border-amber-400/40 bg-amber-500/[0.04]" : "border-zinc-800 bg-zinc-950/30"}`}>
+                  <div key={it.id} className={`mobile-market-card rounded-xl border p-4 ${it.pinned_at ? "border-amber-400/40 bg-amber-500/[0.04]" : "border-zinc-800 bg-zinc-950/30"}`}>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 empty:hidden"><PinnedTag pinnedAt={it.pinned_at} lang={lang}/><AdminPinButton kind="service" id={it.id} pinnedAt={it.pinned_at} lang={lang} onChanged={(value)=>setItems(prev=>prev.map(x=>x.id===it.id?{...x,pinned_at:value}:x))}/></div>
                     <PostImageGallery paths={it.image_paths} compact />
                     <OwnerBadge userId={it.owner_id} lang={lang}/>
                     <div className="flex items-start justify-between gap-3">
-                      <div className="font-semibold">{it.title}</div>
+                      <div className="market-card-title font-semibold">{it.title}</div>
                       <div className="text-xs rounded-full border border-zinc-700 px-2 py-1 text-zinc-200">
                         {categoryLabel(it.category, lang)}
                       </div>
                     </div>
 
-                    {it.description && <div className="text-zinc-300 mt-2 whitespace-pre-wrap">{it.description}</div>}
+                    {it.description && <div className="market-card-description text-zinc-300 mt-2 whitespace-pre-wrap">{it.description}</div>}
 
                     <p className="mt-2 text-sm text-violet-300">{formatTaskTime(it, lang)}</p>
                     <div className="text-zinc-500 text-sm mt-2 flex gap-3 flex-wrap">
                       <span>{new Date(it.created_at).toLocaleString()}</span>
-                      {it.price != null && <span>£{it.price}</span>}
+                      {it.price != null && <span className="market-card-price">£{it.price}</span>}
                       <span className="text-amber-300">{lang==="zh"?`押金 £${it.required_deposit.toFixed(2)}`:`Deposit £${it.required_deposit.toFixed(2)}`}</span>
                       <a className="text-zinc-300 hover:text-white underline" href={`/${lang}/services/${it.id}`}>
                         {t.common.details}

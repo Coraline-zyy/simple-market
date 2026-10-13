@@ -79,3 +79,31 @@ html { scroll-behavior: smooth; }
 .home-user-motion .home-modules { transition:opacity 1200ms ease-out,transform 1200ms ease-out; }
 .home-user-motion .home-module { transition:opacity 950ms ease var(--module-delay),transform 950ms ease var(--module-delay); }
 .home-user-motion .home-explore > span:last-child { transition:transform 700ms; }
+
+/* Mobile layout experiment: desktop and home animation are unchanged. */
+.mobile-filter-toggle { display:none; }
+.hall-optional-filters { display:contents; }
+@media (max-width:767px) {
+  body:has(.mobile-primary-links) { padding-bottom:calc(72px + env(safe-area-inset-bottom)); }
+  .mobile-primary-links {
+    position:fixed; inset:auto 0 0; z-index:45;
+    gap:3px; padding:8px 8px calc(8px + env(safe-area-inset-bottom));
+    background:#0d0f19; border-top:1px solid rgb(255 255 255 / .1);
+  }
+  .mobile-primary-links > a { min-height:44px; font-size:11px; padding:8px 2px; }
+  .mobile-primary-links > a:focus-visible { outline:2px solid #a78bfa; outline-offset:-2px; }
+  .workspace-tabs { display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px; padding:6px; scroll-padding:6px; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
+  .workspace-tabs > button { flex:0 0 auto; white-space:nowrap; padding:8px 14px; }
+  .hall-filter-grid { grid-template-columns:minmax(0,1fr); }
+  .hall-filter-grid > .mobile-filter-toggle { display:flex; align-items:center; justify-content:space-between; min-height:44px; width:100%; border:1px solid #3f3f46; border-radius:10px; padding:10px 12px; color:#c4b5fd; font-size:14px; }
+  .hall-optional-filters { display:none; }
+  .hall-optional-filters[data-open="true"] { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
+  .hall-optional-filters > select:disabled { display:none; }
+  .hall-optional-filters > button:last-child { grid-column:1 / -1; }
+  .mobile-market-card { padding:14px; border-radius:16px; overflow-wrap:anywhere; }
+  .mobile-market-card > button[aria-label="Open full-size image"] { width:88px; height:88px; margin-left:12px; }
+  .market-card-title { font-size:17px; line-height:1.45; }
+  .market-card-description { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:14px; line-height:1.65; }
+  .market-card-price { color:#ede9fe; font-size:16px; font-weight:700; }
+  .mobile-market-card a[href*="/demands/"],.mobile-market-card a[href*="/services/"] { display:inline-flex; align-items:center; min-height:44px; padding:4px 8px; margin-left:auto; color:#c4b5fd; }
+}
