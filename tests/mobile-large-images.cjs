@@ -6,6 +6,12 @@ const read=file=>fs.readFileSync(path.resolve(__dirname,'..',file),'utf8');
 test('both halls explicitly opt into large mobile images',()=>{
  for(const kind of ['demands','services'])assert.match(read(`app/[lang]/${kind}/page.tsx`),/<PostImageGallery paths=\{it.image_paths\} compact mobileFeed \/>/);
 });
+test('prices are labeled in shared card markup for both desktop and mobile',()=>{
+ for(const [kind,value] of [['demands','budget'],['services','price']]){
+  const source=read(`app/[lang]/${kind}/page.tsx`);
+  assert.ok(source.includes(`it.${value} != null && <span className="market-card-price">price: £{it.${value}}</span>`));
+ }
+});
 test('large images still use the original full-image viewer and zoom controls',()=>{
  const gallery=read('app/components/PostImageGallery.tsx');assert.match(gallery,/mobileFeed = false/);assert.match(gallery,/onClick=\{\(\)=>open\(url\)\}/);assert.match(gallery,/aria-label="Zoom in"/);assert.match(gallery,/aria-label="Close"/);
 });

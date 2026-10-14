@@ -502,7 +502,7 @@ export default function DemandsPage() {
                     <p className="mt-2 text-sm text-violet-300">{formatTaskTime(it, lang)}</p>
                     <div className="text-zinc-500 text-sm mt-2 flex gap-3 flex-wrap">
                       <span>{new Date(it.created_at).toLocaleString()}</span>
-                      {it.budget != null && <span className="market-card-price">£{it.budget}</span>}
+                      {it.budget != null && <span className="market-card-price">price: £{it.budget}</span>}
                       <span className="text-amber-300">{lang==="zh"?`押金 £${it.required_deposit.toFixed(2)}`:`Deposit £${it.required_deposit.toFixed(2)}`}</span>
                       <a className="text-zinc-300 hover:text-white underline" href={`/${lang}/demands/${it.id}`}>
                         {t.common.details}
