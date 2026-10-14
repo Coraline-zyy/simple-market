@@ -19,7 +19,7 @@ test('rating cannot wrap and date moves below author only on mobile',()=>{
   const values=Object.fromEntries(rule.nodes.map(node=>[node.prop,node.value]));
   if(rule.selector==='.comment-author-header'){header=true;assert.equal(values['flex-direction'],'column');}
   if(rule.selector.includes('span:last-child')){rating=true;assert.equal(values['white-space'],'nowrap');assert.equal(values['flex-shrink'],'0');}
-  if(rule.selector.includes('.comment-published-at'))date=true;
+  if(rule.selector.includes('.comment-published-at')){date=true;assert.equal(values['padding-left'],'0');}
  });
  assert.ok(header&&rating&&date);
 });

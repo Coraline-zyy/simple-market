@@ -115,7 +115,7 @@ html { scroll-behavior: smooth; }
   .comment-author-header > a > img,.comment-author-header > a > span:first-child { flex-shrink:0; }
   .comment-author-header > a > span:nth-child(2) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .comment-author-header > a > span:last-child { display:inline-flex; align-items:center; flex-shrink:0; white-space:nowrap; }
-  .comment-author-header > .comment-published-at { padding-left:40px; line-height:1.5; }
+  .comment-author-header > .comment-published-at { padding-left:0; line-height:1.5; }
 }
 @media (max-width:767px) {
   .mobile-market-card:has(.mobile-feed-image) { display:flex; flex-direction:column; }
