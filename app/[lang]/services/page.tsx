@@ -5,6 +5,8 @@ import {DepositDraft} from "@/app/components/PaymentPreview";
 import { useEffect, useMemo, useRef, useState } from "react";
 import PostImageGallery from "@/app/components/PostImageGallery";
 import MobileHallFilters from "@/app/components/MobileHallFilters";
+import MobileFeedTabs from "@/app/components/MobileFeedTabs";
+import MobileTradeSummary from "@/app/components/MobileTradeSummary";
 import { MAX_POST_IMAGES, uploadPostImages } from "@/lib/media";
 import { supabase } from "@/lib/supabaseClient";
 import { ALL_VALUE, categoryLabel, getT, safeLang } from "@/lib/i18n";
@@ -69,6 +71,7 @@ export default function ServicesPage() {
   const [requiredDeposit,setRequiredDeposit]=useState("0");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [showPublish, setShowPublish] = useState(false);
+  useEffect(()=>{if(new URLSearchParams(window.location.search).get("publish")==="1")setShowPublish(true)},[lang]);
   const submittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -363,6 +366,8 @@ export default function ServicesPage() {
   return (
     <main className="market-hall min-h-screen bg-[#080a12] text-zinc-100 px-6 py-10">
       <div className="max-w-5xl mx-auto">
+        <MobileFeedTabs lang={lang}/>
+        <MobileTradeSummary lang={lang}/>
         <div className="hall-heading relative flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-3xl font-black tracking-tight">{t.servicesHall.title}</h1>
@@ -491,8 +496,8 @@ export default function ServicesPage() {
                 {filtered.map((it) => (
                   <div key={it.id} className={`mobile-market-card rounded-xl border p-4 ${it.pinned_at ? "border-amber-400/40 bg-amber-500/[0.04]" : "border-zinc-800 bg-zinc-950/30"}`}>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 empty:hidden"><PinnedTag pinnedAt={it.pinned_at} lang={lang}/><AdminPinButton kind="service" id={it.id} pinnedAt={it.pinned_at} lang={lang} onChanged={(value)=>setItems(prev=>prev.map(x=>x.id===it.id?{...x,pinned_at:value}:x))}/></div>
-                    <PostImageGallery paths={it.image_paths} compact />
-                    <OwnerBadge userId={it.owner_id} lang={lang}/>
+                    <div className="poster-card-media"><PostImageGallery paths={it.image_paths} compact /></div>
+                    <div className="poster-card-author"><OwnerBadge userId={it.owner_id} lang={lang}/></div>
                     <div className="flex items-start justify-between gap-3">
                       <div className="market-card-title font-semibold">{it.title}</div>
                       <div className="text-xs rounded-full border border-zinc-700 px-2 py-1 text-zinc-200">
@@ -502,8 +507,8 @@ export default function ServicesPage() {
 
                     {it.description && <div className="market-card-description text-zinc-300 mt-2 whitespace-pre-wrap">{it.description}</div>}
 
-                    <p className="mt-2 text-sm text-violet-300">{formatTaskTime(it, lang)}</p>
-                    <div className="text-zinc-500 text-sm mt-2 flex gap-3 flex-wrap">
+                    <p className="poster-card-time mt-2 text-sm text-violet-300">{formatTaskTime(it, lang)}</p>
+                    <div className="poster-card-meta text-zinc-500 text-sm mt-2 flex gap-3 flex-wrap">
                       <span>{new Date(it.created_at).toLocaleString()}</span>
                       {it.price != null && <span className="market-card-price">£{it.price}</span>}
                       <span className="text-amber-300">{lang==="zh"?`押金 £${it.required_deposit.toFixed(2)}`:`Deposit £${it.required_deposit.toFixed(2)}`}</span>
