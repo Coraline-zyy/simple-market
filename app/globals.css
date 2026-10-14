@@ -107,3 +107,19 @@ html { scroll-behavior: smooth; }
   .market-card-price { color:#ede9fe; font-size:16px; font-weight:700; }
   .mobile-market-card a[href*="/demands/"],.mobile-market-card a[href*="/services/"] { display:inline-flex; align-items:center; min-height:44px; padding:4px 8px; margin-left:auto; color:#c4b5fd; }
 }
+
+/* Only large feed images are retained from the rejected poster redesign. */
+@media (max-width:767px) {
+  .mobile-market-card:has(.mobile-feed-image) { display:flex; flex-direction:column; }
+  .mobile-market-card:has(.mobile-feed-image) > div:first-child { order:0; }
+  .mobile-market-card:has(.mobile-feed-image) > a { order:1; }
+  .mobile-market-card:has(.mobile-feed-image) > .flex.items-start { order:2; }
+  .mobile-market-card:has(.mobile-feed-image) > .market-card-description { order:3; }
+  .mobile-market-card:has(.mobile-feed-image) > p { order:4; }
+  .mobile-market-card > button.mobile-feed-image[aria-label="Open full-size image"] { order:5; float:none; width:100%; height:auto; aspect-ratio:4 / 3; margin:12px 0 0; }
+  .mobile-market-card:has(.mobile-feed-image) > div:last-child { order:6; }
+  .mobile-feed-image > img { object-fit:cover; }
+  .large-image-feed article > .grid { display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x proximity; }
+  .large-image-feed article > .grid > button { flex:0 0 100%; width:100%; height:auto; aspect-ratio:4 / 3; min-height:0; scroll-snap-align:start; }
+  .large-image-feed article > .grid > button > img { width:100%; height:100%; max-height:none; object-fit:cover; }
+}

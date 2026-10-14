@@ -3,7 +3,7 @@
 import { POST_IMAGES_BUCKET, publicStorageUrl } from "@/lib/media";
 import {useState} from "react";
 
-export default function PostImageGallery({ paths, compact = false }: { paths?: string[] | null; compact?: boolean }) {
+export default function PostImageGallery({ paths, compact = false, mobileFeed = false }: { paths?: string[] | null; compact?: boolean; mobileFeed?: boolean }) {
   const safe = (paths ?? []).filter(Boolean);
   const [active,setActive]=useState<string|null>(null);
   const [zoom,setZoom]=useState(1);
@@ -14,7 +14,7 @@ export default function PostImageGallery({ paths, compact = false }: { paths?: s
 
   if (compact) {
     const url = publicStorageUrl(POST_IMAGES_BUCKET, safe[0]);
-    return url ? <><button type="button" onClick={()=>open(url)} className="float-right ml-4 mb-2 flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-800 bg-black/20 sm:h-36 sm:w-36" aria-label="Open full-size image"><img src={url} alt="" className="h-full w-full object-contain" /></button>{viewer}</> : null;
+    return url ? <><button type="button" onClick={()=>open(url)} className={`${mobileFeed?"mobile-feed-image ":""}float-right ml-4 mb-2 flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-800 bg-black/20 sm:h-36 sm:w-36`} aria-label="Open full-size image"><img src={url} alt="" className="h-full w-full object-contain" /></button>{viewer}</> : null;
   }
 
   return (

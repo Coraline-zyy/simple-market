@@ -17,10 +17,11 @@ test('original CSS is untouched; visible layout changes are mobile-only',()=>{
  assert.equal(hash(css.slice(0,boundary)),'e0dd801829cdd08493de2c824e1f2c89eba2af68c2e23fe75dbc445429f71e5c');
  const extra=postcss.parse(css.slice(boundary));
  const rules=extra.nodes.filter(node=>node.type!=='comment');
- assert.equal(rules.length,3);
+ assert.equal(rules.length,4);
  assert.equal(rules[0].selector,'.mobile-filter-toggle');assert.equal(rules[0].nodes[0].value,'none');
  assert.equal(rules[1].selector,'.hall-optional-filters');assert.equal(rules[1].nodes[0].value,'contents');
  assert.equal(rules[2].name,'media');assert.equal(rules[2].params,'(max-width:767px)');
+ assert.equal(rules[3].name,'media');assert.equal(rules[3].params,'(max-width:767px)');
 });
 test('both halls keep original filters and callbacks inside mobile disclosure',()=>{
  for(const kind of ['demands','services']){

@@ -488,7 +488,7 @@ export default function DemandsPage() {
                 {filtered.map((it) => (
                   <div key={it.id} className={`mobile-market-card rounded-xl border p-4 ${it.pinned_at ? "border-amber-400/40 bg-amber-500/[0.04]" : "border-zinc-800 bg-zinc-950/30"}`}>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 empty:hidden"><PinnedTag pinnedAt={it.pinned_at} lang={lang}/><AdminPinButton kind="demand" id={it.id} pinnedAt={it.pinned_at} lang={lang} onChanged={(value)=>setItems(prev=>prev.map(x=>x.id===it.id?{...x,pinned_at:value}:x))}/></div>
-                    <PostImageGallery paths={it.image_paths} compact />
+                    <PostImageGallery paths={it.image_paths} compact mobileFeed />
                     <OwnerBadge userId={it.owner_id} lang={lang}/>
                     <div className="flex items-start justify-between gap-3">
                       <div className="market-card-title font-semibold">{it.title}</div>
