@@ -7,7 +7,7 @@ const read=file=>fs.readFileSync(path.resolve(__dirname,'..',file),'utf8');
 test('mobile comment author and date have separately scoped header classes',()=>{
  const page=read('app/[lang]/community/[id]/page.tsx');
  assert.match(page,/comment-author-header flex items-center gap-2"><OwnerBadge userId=\{c.author_id\}/);
- assert.match(page,/comment-published-at text-xs text-zinc-500">· \{new Date\(c.created_at\)/);
+ assert.match(page,/comment-published-at text-xs text-zinc-500"><span aria-hidden="true" className="hidden md:inline">· <\/span>\{new Date\(c.created_at\)/);
  assert.ok(page.includes('commentLikes.toggle(c.id,lang)'));
 });
 test('rating cannot wrap and date moves below author only on mobile',()=>{
