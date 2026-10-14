@@ -7,11 +7,9 @@ const postcss=require('postcss');
 const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8').replace(/\r\n/g,'\n');
 const hash=value=>createHash('sha256').update(value.trimEnd()).digest('hex');
-test('original animation and desktop navigation markup remain unchanged',()=>{
+test('original animation and navigation markup remain byte-equivalent',()=>{
  assert.equal(hash(read('app/components/HomeExperience.tsx')),'963f9daa149087e8da67480a8367637e7e0319f6fb27eacb6f5fcceda67bd1a9');
- const nav=read('app/components/PrimaryNav.tsx');
- const desktop=nav.slice(nav.indexOf(' return <header'),nav.indexOf('</div></div>{!home&&!login&&'));
- assert.equal(hash(desktop),'31391078d3335ed5d4701bbf9468e4e620e418b369bddc7bce82a560a26412fe');
+ assert.equal(hash(read('app/components/PrimaryNav.tsx')),'52394a6c5ad6fee8167871fcdea828135506c42d22354a8f0e40cb6fa8876628');
 });
 test('original CSS is untouched; visible layout changes are mobile-only',()=>{
  const css=read('app/globals.css'),marker='/* Mobile layout experiment:',boundary=css.indexOf(marker);
@@ -19,12 +17,10 @@ test('original CSS is untouched; visible layout changes are mobile-only',()=>{
  assert.equal(hash(css.slice(0,boundary)),'e0dd801829cdd08493de2c824e1f2c89eba2af68c2e23fe75dbc445429f71e5c');
  const extra=postcss.parse(css.slice(boundary));
  const rules=extra.nodes.filter(node=>node.type!=='comment');
+ assert.equal(rules.length,3);
  assert.equal(rules[0].selector,'.mobile-filter-toggle');assert.equal(rules[0].nodes[0].value,'none');
  assert.equal(rules[1].selector,'.hall-optional-filters');assert.equal(rules[1].nodes[0].value,'contents');
- for(const rule of rules.slice(2)){
-  if(rule.type==='atrule'){assert.equal(rule.name,'media');assert.equal(rule.params,'(max-width:767px)');}
-  else {assert.ok(['.poster-feed-tabs,.poster-trade-summary,.poster-bottom-nav,.poster-post-overlay','.poster-card-author,.poster-card-media'].includes(rule.selector));assert.ok(['none','contents'].includes(rule.nodes[0].value));}
- }
+ assert.equal(rules[2].name,'media');assert.equal(rules[2].params,'(max-width:767px)');
 });
 test('both halls keep original filters and callbacks inside mobile disclosure',()=>{
  for(const kind of ['demands','services']){
