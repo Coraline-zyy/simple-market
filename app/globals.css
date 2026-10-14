@@ -110,6 +110,14 @@ html { scroll-behavior: smooth; }
 
 /* Only large feed images are retained from the rejected poster redesign. */
 @media (max-width:767px) {
+  .comment-author-header { flex-direction:column; align-items:flex-start; gap:4px; }
+  .comment-author-header > a { margin-bottom:0; max-width:100%; min-width:0; }
+  .comment-author-header > a > img,.comment-author-header > a > span:first-child { flex-shrink:0; }
+  .comment-author-header > a > span:nth-child(2) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .comment-author-header > a > span:last-child { display:inline-flex; align-items:center; flex-shrink:0; white-space:nowrap; }
+  .comment-author-header > .comment-published-at { padding-left:40px; line-height:1.5; }
+}
+@media (max-width:767px) {
   .mobile-market-card:has(.mobile-feed-image) { display:flex; flex-direction:column; }
   .mobile-market-card:has(.mobile-feed-image) > div:first-child { order:0; }
   .mobile-market-card:has(.mobile-feed-image) > a { order:1; }
