@@ -35,7 +35,7 @@ export default function AppPage() {
   return <main className="px-5 py-10">
     <div className="mx-auto max-w-4xl">
       <section className="flex flex-col items-center rounded-3xl border border-white/10 bg-gradient-to-b from-violet-500/15 to-[#11131e] px-6 py-10 text-center">
-        <img src="/icons/icon-512.png" alt="" className="h-24 w-24 rounded-3xl shadow-2xl shadow-violet-900/50" />
+        <img src="/icons/icon-512.png?v=20261019" alt="" className="h-24 w-24 rounded-3xl shadow-2xl shadow-violet-900/50" />
         <h1 className="mt-5 text-3xl font-black">{zh ? "「有求」App" : "The youqiu app"}</h1>
         <p className="mt-3 max-w-xl leading-7 text-zinc-300">{zh ? "无需应用商店，添加到桌面即可使用。支持的浏览器可显示图标未读数；新消息可通过邮件提醒。暂不含关闭应用后的后台推送。" : "No app store required. Open it from your home screen, with icon badges where supported and email alerts for new messages. Background push is not included."}</p>
         <div className="mt-6">

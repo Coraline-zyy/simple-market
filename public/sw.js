@@ -1,9 +1,9 @@
 // Service worker for the youqiu app.
 // Pages and data always come from the network first (so chats are never stale);
 // a cached copy / offline page is only used when there is no connection.
-const VERSION = "youqiu-v2-audited";
+const VERSION = "youqiu-v3-latin-icon-20261019";
 const OFFLINE_URL = "/offline.html";
-const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png"];
+const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png?v=20261019", "/icons/icon-512.png?v=20261019"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));

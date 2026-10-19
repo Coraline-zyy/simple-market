@@ -16,14 +16,14 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "en",
     categories: ["social", "lifestyle", "productivity"],
     icons: [
-      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/icon-192.png?v=20261019", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-512.png?v=20261019", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-maskable-512.png?v=20261019", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [
-      { name: "聊天 Chats", url: "/en/me?tab=chat", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
-      { name: "需求 Requests", url: "/en/demands", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
-      { name: "服务 Services", url: "/en/services", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "聊天 Chats", url: "/en/me?tab=chat", icons: [{ src: "/icons/icon-192.png?v=20261019", sizes: "192x192" }] },
+      { name: "需求 Requests", url: "/en/demands", icons: [{ src: "/icons/icon-192.png?v=20261019", sizes: "192x192" }] },
+      { name: "服务 Services", url: "/en/services", icons: [{ src: "/icons/icon-192.png?v=20261019", sizes: "192x192" }] },
     ],
   };
 }

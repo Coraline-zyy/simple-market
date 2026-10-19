@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "有求", statusBarStyle: "black" },
   formatDetection: { telephone: false },
   icons: {
-    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    icon: [{ url: "/icons/icon-192.png?v=20261019", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png?v=20261019", sizes: "180x180" }],
   },
 };
 

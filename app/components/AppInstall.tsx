@@ -70,7 +70,7 @@ export default function InstallBanner({ lang }: { lang: "zh" | "en" }) {
 
   return <div className="fixed inset-x-3 bottom-3 z-[80] mx-auto max-w-md rounded-2xl border border-violet-400/30 bg-[#141628]/95 p-4 shadow-2xl backdrop-blur-xl sm:bottom-5" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
     <div className="flex items-start gap-3">
-      <img src="/icons/icon-192.png" alt="" className="h-12 w-12 shrink-0 rounded-xl" />
+      <img src="/icons/icon-192.png?v=20261019" alt="" className="h-12 w-12 shrink-0 rounded-xl" />
       <div className="min-w-0 flex-1">
         <p className="font-bold">{zh ? "安装「有求」App" : "Install the youqiu app"}</p>
         {ios
