@@ -6,6 +6,19 @@ const sharp = require('sharp');
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
+test('favicon contains an RGBA PNG accepted by the production ICO decoder', async () => {
+  const ico = fs.readFileSync(path.join(root, 'app/favicon.ico'));
+  assert.equal(ico.readUInt16LE(2), 1);
+  assert.equal(ico.readUInt16LE(4), 1);
+  const length = ico.readUInt32LE(14), offset = ico.readUInt32LE(18);
+  assert.equal(offset + length, ico.length);
+  const png = ico.subarray(offset, offset + length);
+  assert.equal(png[25], 6, 'ICO PNG must use RGBA color type, not RGB');
+  const metadata = await sharp(png).metadata();
+  assert.equal(metadata.width, 32); assert.equal(metadata.height, 32);
+  assert.equal(metadata.channels, 4); assert.equal(metadata.hasAlpha, true);
+});
+
 test('all PWA icon consumers request the same new artwork revision', () => {
   for (const file of ['app/components/AppInstall.tsx', 'app/[lang]/app/page.tsx',
     'app/layout.tsx', 'app/manifest.ts', 'public/offline.html', 'public/sw.js']) {

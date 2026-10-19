@@ -16,7 +16,8 @@ async function main() {
     await sharp(source).resize(size, size).flatten({background:'#5b3de8'})
       .png().toFile(path.join(root, 'public/icons', name));
   }
-  const png = await sharp(source).resize(32, 32).png().toBuffer();
+  // ICO's embedded PNG must be RGBA for the production image decoder.
+  const png = await sharp(source).resize(32, 32).ensureAlpha().png().toBuffer();
   const header = Buffer.alloc(22);
   header.writeUInt16LE(1, 2);
   header.writeUInt16LE(1, 4);
